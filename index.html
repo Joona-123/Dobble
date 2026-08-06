@@ -1,0 +1,3325 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Dobble</title>
+<meta name="theme-color" content="#111730">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Dobble">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<style>
+:root{--ink:#111730;--ink2:#1A2143;--line:#2B3563;--chalk:#F6F3EA;--warm:#FFC94A;--mute:#8E97BE;--dead:#4C5680;
+--disp:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+--mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+input,textarea,.clog{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
+/* Pelin aikana sivu ei vieri: kortit on mitoitettu näkymään sopiviksi. */
+html.pelissa,body.pelissa{overflow:hidden;height:100%;
+ overscroll-behavior:none;touch-action:manipulation}
+/* Valinta pois koko sovelluksesta: nopea näpyttely valitsi tekstiä ja
+   selain tarjosi "hae verkosta". Sallitaan vain siellä missä sitä tarvitaan. */
+body{background:var(--ink);color:var(--chalk);font-family:var(--disp);min-height:100vh;
+ -webkit-font-smoothing:antialiased;
+ -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+ touch-action:manipulation;
+ padding:max(14px,env(safe-area-inset-top)) 14px calc(20px + env(safe-area-inset-bottom))}
+.wrap{max-width:820px;margin:0 auto}
+.eyebrow{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);margin:0 0 6px}
+h1{font-weight:800;font-size:clamp(28px,8.5vw,44px);letter-spacing:-.04em;line-height:.94;margin:0 0 5px}
+.subh{font-size:13px;color:#C9CEE6;margin:0 0 14px;line-height:1.45}
+
+.ladder{display:grid;grid-template-columns:repeat(auto-fit,minmax(58px,1fr));gap:4px}
+.rung{appearance:none;background:var(--ink2);border:1px solid var(--line);border-radius:7px;
+ padding:7px 2px 6px;cursor:pointer;text-align:center;color:var(--chalk);font-family:inherit}
+.rung .n{font-weight:800;font-size:18px;letter-spacing:-.02em;line-height:1}
+.rung .s{display:block;font-family:var(--mono);font-size:7px;letter-spacing:.02em;color:var(--mute);margin-top:4px}
+.rung.on{background:var(--warm);border-color:var(--warm);color:#221A05}
+.rung.on .s{color:#6B531A}
+.rung.dead,.rung.open{background:none;border-style:dashed;color:var(--dead)}
+.rung.dead .n{text-decoration:line-through}
+.rung.open{border-style:dotted}
+.rung.dead .s,.rung.open .s{color:var(--dead)}
+.hide{appearance:none;background:none;border:0;color:var(--mute);font-family:var(--mono);
+ font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;padding:9px 2px 0;cursor:pointer}
+
+.toph{display:flex;align-items:baseline;gap:8px;margin:0 0 8px}
+.toph b{font-weight:800;font-size:17px;letter-spacing:-.03em}
+.toph i{font-style:normal;font-family:var(--mono);font-size:8.5px;letter-spacing:.14em;
+ text-transform:uppercase;color:var(--mute)}
+.ladbar{display:flex;align-items:center;gap:9px;width:100%;appearance:none;background:var(--ink2);
+ border:1px solid var(--line);border-radius:9px;padding:10px 13px;color:var(--chalk);
+ font-family:inherit;font-size:13.5px;cursor:pointer;text-align:left}
+.ladbar b{font-weight:800;font-size:19px;letter-spacing:-.02em}
+.ladbar i{font-style:normal;font-family:var(--mono);font-size:9.5px;color:var(--mute);letter-spacing:.05em}
+.ladbar em{margin-left:auto;font-style:normal;font-family:var(--mono);font-size:9.5px;
+ letter-spacing:.12em;text-transform:uppercase;color:var(--warm)}
+
+.readout{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--mute);margin:11px 0 0}
+.readout b{color:var(--chalk);font-weight:400}
+.msg{display:flex;gap:9px;background:var(--ink2);border-left:2px solid var(--dead);border-radius:0 6px 6px 0;
+ padding:11px 13px;margin:11px 0 0;font-size:12.5px;line-height:1.55;color:#AEB6D8}
+.msg i{font-style:normal;flex:none;color:var(--dead);font-weight:700}
+
+.tabs{display:flex;gap:4px;margin:14px 0 12px;border-bottom:1px solid var(--line)}
+.tab{appearance:none;background:none;border:0;border-bottom:2px solid transparent;color:var(--mute);
+ font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;padding:9px 11px;
+ margin-bottom:-1px;cursor:pointer}
+.tab.on{color:var(--warm);border-bottom-color:var(--warm)}
+
+.stack{display:flex;flex-direction:column;align-items:center;gap:10px;margin:0 auto;width:100%;
+ position:relative}
+.stack.veil .disc{visibility:hidden}
+.veilmsg{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+ justify-content:center;gap:4px;background:var(--ink2);border:1px solid var(--line);
+ border-radius:14px}
+.veilmsg span{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+ color:var(--mute)}
+.veilmsg b{font-size:40px;font-weight:800;letter-spacing:-.03em;color:var(--warm);
+ font-variant-numeric:tabular-nums}
+.stack.row{flex-direction:row}
+.stack .disc{width:100%}
+.stack.row .disc{flex:1 1 0;width:auto}
+.disc{position:relative;aspect-ratio:1;border-radius:50%;background:var(--chalk);overflow:hidden;
+ box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 5px 18px rgba(0,0,0,.42)}
+.slot{position:absolute;line-height:0;padding:0;margin:0;background:none;border:0}
+.gl{display:block;line-height:0;transition:filter .2s,opacity .2s}
+/* Himmennys luokalla: paljastus ei vaadi korttien piirtämistä uusiksi. */
+.slot.dim .gl{filter:grayscale(1);opacity:.3}
+/* Neliömäinen laatikko: emojikirjasimet varaavat leveyttä eri tavoin,
+   ja ilman kiinteää mittaa korostuskehästä tulisi soikea. */
+.emo{display:flex;align-items:center;justify-content:center;
+ width:1em;height:1em;font-size:.93em;line-height:1;
+ text-align:center;overflow:visible;
+ font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Twemoji Mozilla",sans-serif}
+.emo.fade{filter:grayscale(1);opacity:.3}
+/* Napin ja tekstin laatikot on oltava täsmälleen samat, muuten kuva
+   liikahtaa 8 px aina kun kortti vaihtuu napautettavasta lukituksi.
+   Kosketusalue laajennetaan näkymättömällä pseudoelementillä. */
+button.slot{cursor:pointer;padding:0;margin:0;border-radius:50%}
+button.slot::before{content:"";position:absolute;inset:-7px}
+/* Kehä on oikea elementti, ei pseudoelementti, ja sen animaatio soitetaan
+   kerran suoraan JavaScriptista. Näin mikään luokan vaihto, uudelleenpiirto
+   tai asettelun uudelleenlaskenta ei voi käynnistää sitä toistamiseen.
+   Mitat em-yksiköin paikan koosta, joten kehä on aina ympyrä. */
+.slot .ring{position:absolute;left:50%;top:50%;
+ width:1.62em;height:1.62em;margin:-.81em 0 0 -.81em;
+ border-radius:50%;border:max(1.5px,.038em) solid #B8860B;box-sizing:border-box;
+ pointer-events:none}
+@keyframes pop{from{transform:scale(.55);opacity:0}to{transform:scale(1);opacity:1}}
+.cno{position:absolute;left:50%;bottom:1%;transform:translateX(-50%);font-family:var(--mono);
+ color:#B0AA9A;letter-spacing:.1em;line-height:1}
+.shake{animation:shk .4s}
+@keyframes shk{0%,100%{transform:translateX(0)}25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
+
+.hud{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-bottom:10px}
+.hud i{font-style:normal;font-family:var(--mono);font-size:11px;letter-spacing:.07em;color:var(--mute)}
+.line{font-size:14px;text-align:center;margin:12px 0 0;line-height:1.6}
+.line b{font-weight:600}
+.hint{font-size:12.5px;color:var(--mute);text-align:center;margin:9px 0 0;line-height:1.5;
+ min-height:19px}
+.ig{display:inline-block;vertical-align:-5px;margin:0 2px}
+.mid{text-align:center;margin-top:12px}
+.btn{appearance:none;display:inline-flex;align-items:center;gap:7px;background:var(--warm);color:#221A05;
+ border:0;border-radius:999px;padding:11px 20px;cursor:pointer;font-family:var(--mono);font-size:11px;
+ letter-spacing:.1em;text-transform:uppercase;font-weight:700}
+.btn.ghost{background:none;color:var(--mute);border:1px solid var(--line);font-weight:400}
+
+.picker{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;justify-content:center;margin:14px 0 4px}
+.step span{display:block;font-family:var(--mono);font-size:8.5px;letter-spacing:.13em;text-transform:uppercase;
+ color:var(--mute);margin-bottom:4px;text-align:center}
+.step div{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.step button{appearance:none;background:var(--ink2);border:0;color:var(--mute);padding:0 12px;cursor:pointer;
+ font-size:16px;font-family:inherit}
+.step input{width:66px;background:none;border:0;border-left:1px solid var(--line);border-right:1px solid var(--line);
+ color:var(--chalk);text-align:center;font-family:var(--mono);font-size:13px;padding:9px 0}
+.step input::-webkit-outer-spin-button,.step input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.idxh{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin:14px 0 8px}
+.idx{display:grid;grid-template-columns:repeat(auto-fill,minmax(30px,1fr));gap:3px;
+ max-height:132px;overflow-y:auto;overscroll-behavior:contain;
+ -webkit-overflow-scrolling:touch}
+.chip{appearance:none;background:var(--ink2);border:1px solid var(--line);border-radius:4px;color:var(--mute);
+ font-family:var(--mono);font-size:9.5px;padding:5px 0;cursor:pointer}
+.chip.on{background:var(--warm);border-color:var(--warm);color:#221A05;font-weight:700}
+
+canvas{width:100%;max-width:560px;height:auto;display:block;border:1px solid var(--line);border-radius:6px;
+ image-rendering:pixelated;margin:12px auto 10px;cursor:crosshair}
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);
+ border-radius:8px;overflow:hidden;margin:20px 0 0}
+.facts>div{background:var(--ink2);padding:13px 14px}
+.facts .w{grid-column:1/-1}
+.facts dt{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--mute);margin:0}
+.facts dd{margin:5px 0 0;font-weight:800;font-size:22px;letter-spacing:-.02em}
+.facts dd.sub{font-weight:400;font-size:12px;color:var(--mute);letter-spacing:0;margin-top:3px}
+.note{font-size:13px;line-height:1.65;color:#AEB6D8;margin:18px 0 0;max-width:62ch}
+.bar{display:flex;align-items:center;gap:9px;background:var(--ink2);border:1px solid var(--line);
+ border-radius:9px;padding:8px 11px;margin:0 0 9px}
+.bar .ph{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;
+ padding:3px 7px;border-radius:4px;background:var(--line);color:var(--chalk)}
+.bar .ph.lobby{background:#2F6D4F;color:#DFF5E8}
+.bar .ph.play{background:var(--warm);color:#221A05}
+.bar .ph.done{background:#5A3E6B;color:#F0DFF7}
+.bar .mid2{font-weight:800;font-size:16px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.bar .rt{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--mute);
+ letter-spacing:.04em;font-variant-numeric:tabular-nums}
+.bar .rt b{color:var(--chalk);font-weight:600}
+.bar .sc2{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--mute);
+ display:inline-flex;align-items:baseline;gap:3px;margin-right:auto}
+.bar .sc2 b{font-family:var(--disp);font-weight:800;font-size:18px;letter-spacing:-.02em;
+ color:var(--warm)}
+.bar .x{appearance:none;background:none;border:1px solid var(--line);border-radius:6px;
+ color:var(--mute);font-family:inherit;font-size:14px;line-height:1;padding:5px 9px;cursor:pointer}
+.bar .x:hover{color:var(--chalk)}
+.bar .stop{appearance:none;background:none;border:1px solid var(--line);border-radius:6px;
+ color:var(--mute);font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+ padding:6px 9px;cursor:pointer}
+
+/* Pelitavan valinta yläreunassa. */
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:5px;background:var(--ink2);
+ border:1px solid var(--line);border-radius:10px;padding:4px;margin:0 0 12px}
+.tabs+.modes{margin-top:-4px}
+.mode{appearance:none;background:none;border:0;border-radius:7px;color:var(--mute);
+ font-family:inherit;font-size:14px;font-weight:600;padding:10px 6px;cursor:pointer}
+.mode.on{background:var(--warm);color:#221A05;font-weight:800}
+.modes{transition:none}
+.mode{transition:background .18s,color .18s}
+.mode:disabled{opacity:.4;cursor:default}
+.mode:focus-visible{outline:2px solid var(--warm);outline-offset:2px}
+.menu{display:grid;gap:10px;margin:4px 0 0}
+.card2{appearance:none;display:block;width:100%;text-align:left;background:var(--ink2);
+ border:1px solid var(--line);border-radius:11px;padding:16px;cursor:pointer;color:var(--chalk);
+ font-family:inherit}
+.card2 b{display:block;font-size:18px;font-weight:800;letter-spacing:-.02em;margin-bottom:4px}
+.card2 span{display:block;font-size:12.5px;color:#AEB6D8;line-height:1.5}
+.card2.hot{border-color:var(--warm)}
+.card2:disabled{opacity:.45;cursor:default}
+
+.lob{display:flex;align-items:center;gap:10px;width:100%;appearance:none;background:var(--ink2);
+ border:1px solid var(--line);border-radius:9px;padding:11px 13px;margin-bottom:5px;cursor:pointer;
+ color:var(--chalk);font-family:inherit;text-align:left}
+.lob .cd{font-family:var(--mono);font-weight:700;font-size:16px;letter-spacing:.12em;color:var(--warm)}
+.lob .inf{flex:1;min-width:0;font-size:12.5px;color:#AEB6D8}
+.lob .st{font-family:var(--mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;
+ padding:3px 6px;border-radius:4px;background:var(--line)}
+.lob .st.play{background:var(--warm);color:#221A05}
+.lob:disabled{opacity:.5;cursor:default}
+.lob.old .cd{color:var(--dead)}
+.lob.old .st{background:none;border:1px solid var(--dead);color:var(--dead)}
+.wait.blk{border-color:#E0574F}
+.vers{display:flex;align-items:baseline;justify-content:center;gap:8px;margin-top:12px}
+.vers span{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;
+ color:var(--mute)}
+.vers b{font-weight:800;font-size:20px;letter-spacing:-.02em}
+.vers b:first-of-type{color:#E0574F}
+.vers b:last-of-type{color:#4ED07E}
+.empty{font-size:13px;color:var(--mute);text-align:center;padding:18px 0;line-height:1.6}
+
+.join{display:flex;gap:7px;margin:12px 0 0}
+.join input{flex:1;min-width:0;background:var(--ink2);border:1px solid var(--line);border-radius:8px;
+ color:var(--chalk);font-family:var(--mono);font-size:16px;letter-spacing:.2em;text-align:center;
+ padding:11px 8px;text-transform:uppercase}
+.join input:focus{outline:none;border-color:var(--warm)}
+
+.opts{margin:14px 0 0}
+.opts h3{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;
+ color:var(--mute);margin:0 0 4px;font-weight:400;display:flex;align-items:baseline;gap:8px}
+.opts h3 b{margin-left:auto;font-family:var(--disp);font-size:20px;font-weight:800;
+ letter-spacing:-.02em;color:var(--chalk);text-transform:none}
+/* touch-action:none estää selainta tulkitsemasta pystyliikettä vieritykseksi,
+   mikä katkaisisi vedon heti kun sormi lipsuu säätimen ulkopuolelle. */
+.sl{-webkit-appearance:none;appearance:none;width:calc(100% - 26px);height:40px;background:none;
+ cursor:pointer;margin:0 13px 4px;display:block;touch-action:none}
+.sl::-webkit-slider-runnable-track{height:5px;border-radius:3px;background:var(--line)}
+.sl::-moz-range-track{height:5px;border-radius:3px;background:var(--line)}
+.sl::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;
+ background:var(--warm);border:0;margin-top:-9.5px;box-shadow:0 2px 6px rgba(0,0,0,.4)}
+.sl::-moz-range-thumb{width:24px;height:24px;border-radius:50%;background:var(--warm);border:0;
+ box-shadow:0 2px 6px rgba(0,0,0,.4)}
+.sl:disabled{opacity:.4;cursor:default}
+.sl:disabled::-webkit-slider-thumb{background:var(--dead)}
+.sl:disabled::-moz-range-thumb{background:var(--dead)}
+.sl:focus-visible::-webkit-slider-thumb{outline:2px solid var(--chalk);outline-offset:2px}
+.ends{display:flex;justify-content:space-between;font-family:var(--mono);font-size:8.5px;
+ color:var(--mute);letter-spacing:.06em;margin:-4px 13px 12px}
+.opts .sub{font-size:11.5px;color:var(--mute);margin:2px 0 0;line-height:1.5}
+
+/* QR-koodi aulaan liittymistä varten. */
+.qrbox{display:flex;align-items:center;gap:14px;background:var(--ink2);
+ border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:12px 0 0}
+.qrimg{flex:none;line-height:0;background:#F6F3EA;border-radius:7px;padding:5px}
+.qr{display:block;border-radius:3px}
+.qrtxt{flex:1;min-width:0}
+.qrtxt b{display:block;font-family:var(--mono);font-weight:700;font-size:27px;
+ letter-spacing:.16em;color:var(--warm);line-height:1}
+.qrtxt span{display:block;font-size:11.5px;color:var(--mute);line-height:1.45;margin:6px 0 9px}
+.qrtxt .btn{padding:7px 13px;font-size:9.5px}
+
+/* Havainnekuva: kaksi korttia limittäin ja luvut vieressä.
+   HUOM: luokat rear/fore, ei back/front — ".back" on takaisin-painikkeen
+   luokka ja sen background:none kumoaisi kortin taustan. */
+.prev{display:flex;align-items:center;gap:14px;background:var(--ink2);
+ border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin:14px 0 0}
+.opts+.prev,.prev+.opts{margin-top:12px}
+.pvcards{position:relative;width:132px;height:112px;flex:none}
+.mini{position:absolute;width:92px;height:92px;border-radius:50%;
+ background:var(--chalk) !important;overflow:hidden;
+ box-shadow:0 3px 12px rgba(0,0,0,.55)}
+.mini.rear{left:0;top:0;transform:rotate(-9deg);filter:brightness(.84)}
+.mini.fore{left:40px;top:20px;transform:rotate(6deg)}
+.pvnums{flex:1;min-width:0;display:grid;gap:11px}
+.pvn b{display:block;font-weight:800;font-size:25px;letter-spacing:-.03em;
+ line-height:1;color:var(--warm)}
+.pvn span{display:block;font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;
+ text-transform:uppercase;color:var(--mute);margin-top:4px;line-height:1.35}
+@media(max-width:340px){
+ .pvcards{width:108px;height:94px}
+ .mini{width:76px;height:76px}
+ .mini.fore{left:32px;top:16px}
+}
+
+.wait{background:var(--ink2);border:1px solid var(--line);border-radius:10px;padding:18px 16px;
+ text-align:center;margin:0 0 12px}
+.wait h2{margin:0 0 6px;font-size:17px;font-weight:800;letter-spacing:-.02em}
+.wait p{margin:0;font-size:13px;color:#AEB6D8;line-height:1.55}
+.wait .big{font-size:36px;font-weight:800;letter-spacing:-.03em;margin:6px 0 2px;
+ font-variant-numeric:tabular-nums;color:var(--warm)}
+
+.who{display:flex;gap:9px;align-items:center;margin:0 0 10px}
+/* Nimikenttä erottuu muokattavaksi: tummempi tausta kuin paneeleilla,
+   oma otsikko ja kynäkuvake. */
+.nickbox{flex:1;min-width:0;position:relative;display:block;cursor:text;
+ background:var(--ink);border:1px solid var(--line);border-radius:9px;
+ padding:6px 36px 7px 12px;transition:border-color .15s}
+.nickbox:hover{border-color:var(--mute)}
+.nickbox:focus-within{border-color:var(--warm)}
+.nicklab{display:block;font-family:var(--mono);font-size:8px;letter-spacing:.15em;
+ text-transform:uppercase;color:var(--mute);pointer-events:none}
+.nickbox input{width:100%;background:none;border:0;padding:2px 0 0;
+ color:var(--chalk);font-family:inherit;font-size:15.5px;font-weight:600}
+.nickbox input:focus{outline:none}
+.pen{position:absolute;right:11px;top:50%;transform:translateY(-50%);line-height:0;
+ color:var(--mute);pointer-events:none;transition:color .15s}
+.nickbox:hover .pen{color:#C9CEE6}
+.nickbox:focus-within .pen{color:var(--warm)}
+/* HUOM: tilaluokat live/err/busy — EI "wait", joka on jo tietolaatikoiden
+   luokka ja toisi mukanaan täytteen ja reunuksen. Nollataan ne silti
+   varmuuden vuoksi, jottei mikään tuleva sääntö venytä palloa. */
+.who .dot{flex:none;box-sizing:border-box;width:14px;height:14px;min-width:14px;
+ padding:0;border:0;margin:0;border-radius:50%;background:var(--dead);
+ cursor:pointer;position:relative;box-shadow:0 0 0 3px var(--ink2)}
+.who .dot::after{content:"";position:absolute;inset:-10px}
+.who .dot.live{background:#4ED07E}
+.who .dot.err{background:#E0574F;animation:blink 1.1s infinite}
+.who .dot.busy{background:var(--warm);animation:blink 1.1s infinite}
+@keyframes blink{50%{opacity:.35}}
+
+.board{margin:12px 0 0}
+.board h3{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;
+ color:var(--mute);margin:0 0 7px;font-weight:400}
+.row{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:7px;background:var(--ink2);
+ margin-bottom:3px;font-size:13.5px}
+.row.me{background:#23305C;box-shadow:inset 0 0 0 1px var(--line)}
+.row.out{opacity:.45}
+.row .r{font-family:var(--mono);font-size:10px;color:var(--mute);width:18px;flex:none}
+.row .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .sc{font-weight:800;font-size:16px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.row .tag{font-family:var(--mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;
+ color:var(--mute);border:1px solid var(--line);border-radius:4px;padding:2px 5px}
+.row .tag.host{color:var(--warm);border-color:var(--warm)}
+
+/* Konfetit ja voittajan nimi kelluvat kaiken päällä. */
+#confetti{position:fixed;inset:0;z-index:9998;pointer-events:none}
+#confetti[hidden]{display:none}
+/* Aulan viestikenttä */
+.chat{margin:12px 0 0}
+.chat h3{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;
+ color:var(--mute);margin:0 0 7px;font-weight:400}
+.clog{background:var(--ink);border:1px solid var(--line);border-radius:9px 9px 0 0;
+ border-bottom:0;padding:9px 11px;max-height:168px;overflow-y:auto;
+ -webkit-overflow-scrolling:touch}
+.cempty{margin:0;font-size:12px;color:var(--dead);text-align:center;padding:10px 0}
+.cm{font-size:13.5px;line-height:1.45;margin-bottom:5px;word-break:break-word}
+.cm:last-child{margin-bottom:0}
+.cm b{font-weight:700;margin-right:7px;font-size:12px}
+.cm span{color:#DCE1F0}
+.cm.me{background:rgba(255,201,74,.08);border-radius:5px;
+ margin-left:-6px;margin-right:-6px;padding:2px 6px}
+.cm.me span{color:var(--chalk)}
+.crow{display:flex;gap:0;border:1px solid var(--line);border-radius:0 0 9px 9px;
+ overflow:hidden;background:var(--ink2)}
+.crow input{flex:1;min-width:0;background:none;border:0;color:var(--chalk);
+ font-family:inherit;font-size:14px;padding:11px 12px}
+.crow input:focus{outline:none;background:rgba(255,201,74,.06)}
+.csend{appearance:none;flex:none;background:none;border:0;border-left:1px solid var(--line);
+ color:var(--warm);padding:0 15px;cursor:pointer;line-height:0}
+.csend:hover{background:rgba(255,201,74,.10)}
+.csend:active{background:rgba(255,201,74,.18)}
+
+/* Palkintokoroke: osa tulossivua, aina kolme paikkaa. */
+.podium{margin:0 0 14px}
+.pod{display:flex;align-items:flex-end;justify-content:center;gap:7px}
+/* Paikat paljastuvat yksi kerrallaan: pronssi, hopea, kulta. */
+.pod .p{flex:1 1 0;min-width:0;text-align:center;
+ opacity:0;transform:translateY(64px);
+ transition:opacity .5s ease-out,transform .72s cubic-bezier(.18,1.35,.4,1)}
+.podium.v1 .p3,
+.podium.v2 .p3,.podium.v2 .p2,
+.podium.v3 .p3,.podium.v3 .p2,.podium.v3 .p1{opacity:1;transform:none}
+.pod .nm{display:block;font-weight:800;font-size:clamp(16px,5.4vw,24px);
+ letter-spacing:-.025em;color:var(--chalk);line-height:1.1;
+ overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pod .pts{display:block;font-family:var(--disp);font-weight:800;
+ font-size:clamp(15px,4.8vw,21px);letter-spacing:-.02em;
+ color:var(--warm);margin:2px 0 8px}
+.pod .pts u{text-decoration:none;font-family:var(--mono);font-size:9px;
+ font-weight:400;letter-spacing:.1em;color:var(--mute);margin-left:3px}
+.pod .blk{display:flex;flex-direction:column;align-items:center;justify-content:center;
+ border-radius:9px 9px 0 0;box-shadow:0 -2px 16px rgba(0,0,0,.35) inset}
+.pod .blk b{font-weight:800;font-size:clamp(20px,6.4vw,30px);letter-spacing:-.03em;line-height:1}
+.pod .blk i{font-style:normal;font-family:var(--mono);font-size:7.5px;letter-spacing:.16em;
+ text-transform:uppercase;margin-top:3px;opacity:.72}
+.lattia{height:5px;border-radius:0 0 5px 5px;background:var(--line)}
+
+/* Kulta, hopea, pronssi — korkeus kertoo sijan. */
+.pod .p1 .blk{height:96px;background:linear-gradient(#FFD75E,#E0A21C);color:#3A2A02}
+.pod .p2 .blk{height:72px;background:linear-gradient(#DCE2EA,#A8B2C0);color:#242A33}
+.pod .p3 .blk{height:56px;background:linear-gradient(#E5A56B,#B5713A);color:#33200E}
+.pod .p.me .nm{color:var(--warm)}
+.pod .p.tyhja{visibility:hidden}
+/* Tuloslista liukuu esiin vasta kultamitalistin noustua. */
+.tulokset{opacity:0;transform:translateY(26px);
+ transition:opacity .5s ease-out,transform .55s cubic-bezier(.2,1.1,.4,1)}
+.tulokset.nakyy{opacity:1;transform:none}
+
+/* Sakkoikkuna: läpikuultava, katoaa itsestään. */
+#penalty{position:fixed;left:50%;top:50%;z-index:9999;pointer-events:none;
+ transform:translate(-50%,-50%);
+ display:flex;flex-direction:column;align-items:center;gap:1px;
+ background:rgba(46,18,20,.82);border:2px solid #E0574F;border-radius:16px;
+ padding:16px 30px;box-shadow:0 12px 40px rgba(0,0,0,.5);
+ animation:pop3 .22s ease-out}
+#penalty[hidden]{display:none}
+#penalty .pl{font-family:var(--mono);font-size:10px;letter-spacing:.2em;
+ text-transform:uppercase;color:#F0A6A0}
+#penalty b{font-weight:800;font-size:38px;letter-spacing:-.03em;color:#FF8078;
+ font-variant-numeric:tabular-nums;line-height:1.1}
+#penalty .ps{font-family:var(--mono);font-size:8px;letter-spacing:.16em;
+ text-transform:uppercase;color:#C08A86}
+@keyframes pop3{from{transform:translate(-50%,-50%) scale(.8);opacity:0}
+ to{transform:translate(-50%,-50%) scale(1);opacity:1}}
+
+/* Äänten mykistys */
+.mute{flex:none;appearance:none;background:var(--ink);border:1px solid var(--line);
+ border-radius:9px;color:#C9CEE6;padding:9px 10px;cursor:pointer;line-height:0}
+.mute:hover{border-color:var(--mute)}
+.mute.off{color:var(--dead)}
+
+/* Pistekyltti kelluu kaiken päällä ruudun keskellä. Se on app-säiliön
+   ulkopuolella, joten uudelleenpiirto ei käynnistä animaatiota alusta,
+   eikä se vie tilaa korteilta. */
+#toast{position:fixed;left:50%;top:50%;z-index:9999;pointer-events:none;
+ transform:translate(-50%,-50%);background:rgba(20,27,58,.97);
+ border:2px solid var(--warm);border-radius:18px;
+ padding:20px 30px;max-width:82vw;text-align:center;
+ font-family:var(--disp);font-size:21px;font-weight:600;color:var(--chalk);
+ line-height:1.3;box-shadow:0 16px 50px rgba(0,0,0,.65),0 0 0 100vmax rgba(8,11,26,.28);
+ animation:pop2 .34s cubic-bezier(.18,1.5,.42,1);opacity:1;transition:opacity .26s ease-in}
+#toast.mine{border-color:#4ED07E}
+#toast b{font-weight:800;color:var(--warm);display:block;font-size:26px;letter-spacing:-.02em;
+ margin-bottom:2px}
+#toast.mine b{color:#7BE59A}
+#toast.out{opacity:0}
+#toast[hidden]{display:none}
+@keyframes pop2{from{transform:translate(-50%,-50%) scale(.72);opacity:0}
+ to{transform:translate(-50%,-50%) scale(1);opacity:1}}
+@media(max-height:480px){#toast{padding:14px 22px;font-size:17px}#toast b{font-size:21px}}
+
+.need{background:var(--ink2);border-left:2px solid #E0574F;border-radius:0 7px 7px 0;padding:12px 13px;
+ margin:0 0 12px;font-size:12.5px;line-height:1.6;color:#AEB6D8}
+.need b{color:var(--chalk);font-weight:600}
+.need code{font-family:var(--mono);font-size:11px;background:var(--ink);padding:1px 5px;border-radius:3px}
+.scorebig{display:flex;gap:14px;justify-content:center;margin-bottom:8px;height:19px;
+ align-items:center}
+.scorebig i{font-style:normal;font-family:var(--mono);font-size:11px;letter-spacing:.07em;color:var(--mute)}
+.scorebig i b{color:var(--warm);font-weight:700;font-size:14px}
+.hint.pen{color:#F0A6A0}
+.hint.pen b{color:#E0574F;font-weight:800;font-variant-numeric:tabular-nums}
+/* Selvästi painikkeelta näyttävä, riittävän iso kosketettavaksi. */
+.back{appearance:none;display:inline-flex;align-items:center;gap:8px;
+ background:var(--ink2);border:1px solid var(--line);border-radius:9px;
+ color:#C9CEE6;font-family:var(--disp);font-size:13.5px;font-weight:500;
+ letter-spacing:0;text-transform:none;padding:10px 15px;cursor:pointer;margin:0 0 11px}
+.back:hover{border-color:var(--mute);color:var(--chalk)}
+.back:active{background:var(--line)}
+.back:focus-visible{outline:2px solid var(--warm);outline-offset:2px}
+.rowbtn{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px}
+.foot{font-family:var(--mono);font-size:9px;letter-spacing:.08em;color:var(--dead);
+ text-align:center;margin:18px 0 0}
+.lnk{appearance:none;background:none;border:0;padding:0;color:var(--mute);font-family:inherit;
+ font-size:9px;letter-spacing:.08em;text-decoration:underline;cursor:pointer}
+@media(max-height:560px){
+ .toph{display:none}
+ .tabs{margin:8px 0 8px}
+ .hud{margin-bottom:6px}
+ .ladbar{padding:7px 11px;font-size:12.5px}
+ .hint{margin-top:7px}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="config.js"></script>
+<script>
+"use strict";
+
+/* ================= kunta ================= */
+var RED={4:[1,1],8:[1,1,0],9:[2,0],49:[6,0]};
+
+function makeField(q){
+  var p=0,k=0,PR=[2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97],i,pr,n,e;
+  for(i=0;i<PR.length;i++){pr=PR[i];n=q;e=0;
+    while(n%pr===0){n/=pr;e++;}
+    if(n===1&&e>0){p=pr;k=e;break;}}
+  var A=[],M=[],a,b;
+  if(k===1){
+    for(a=0;a<q;a++){A.push(new Uint8Array(q));M.push(new Uint8Array(q));
+      for(b=0;b<q;b++){A[a][b]=(a+b)%q;M[a][b]=(a*b)%q;}}
+    return {p:p,k:k,A:A,M:M};
+  }
+  var R=RED[q];
+  function dig(x){var d=[],j;for(j=0;j<k;j++){d.push(x%p);x=Math.floor(x/p);}return d;}
+  function num(d){var s=0,j;for(j=0;j<k;j++)s+=d[j]*Math.pow(p,j);return s;}
+  for(a=0;a<q;a++){
+    A.push(new Uint8Array(q));M.push(new Uint8Array(q));
+    var DA=dig(a);
+    for(b=0;b<q;b++){
+      var DB=dig(b),s=[],j;
+      for(j=0;j<k;j++)s.push((DA[j]+DB[j])%p);
+      A[a][b]=num(s);
+      var c=new Array(2*k-1);for(j=0;j<2*k-1;j++)c[j]=0;
+      var x,y;
+      for(x=0;x<k;x++)for(y=0;y<k;y++)c[x+y]=(c[x+y]+DA[x]*DB[y])%p;
+      for(var d=2*k-2;d>=k;d--){var co=c[d];if(!co)continue;c[d]=0;
+        for(j=0;j<k;j++)c[d-k+j]=(c[d-k+j]+co*R[j])%p;}
+      M[a][b]=num(c.slice(0,k));
+    }
+  }
+  return {p:p,k:k,A:A,M:M};
+}
+
+/* Suorat lasketaan algebrallisesti: O(n·q) eikä O(n²).
+   Piste on suoralla (a,b,c) kun a·x + b·y + c·z = 0, joten z tai y
+   ratkeaa suoraan käänteisalkiolla. 9507 korttia syntyy millisekunneissa. */
+function buildModel(q){
+  var F=makeField(q),A=F.A,M=F.M,a,b,c,y,z;
+  var neg=new Int32Array(q),inv=new Int32Array(q);
+  for(a=0;a<q;a++)for(b=0;b<q;b++)if(A[a][b]===0){neg[a]=b;break;}
+  for(a=1;a<q;a++)for(b=1;b<q;b++)if(M[a][b]===1){inv[a]=b;break;}
+
+  var n=q*q+q+1,per=q+1,flat=new Int32Array(n*per),reps=[];
+  for(y=0;y<q;y++)for(z=0;z<q;z++)reps.push([1,y,z]);
+  for(z=0;z<q;z++)reps.push([0,1,z]);
+  reps.push([0,0,1]);
+  for(var l=0;l<n;l++){
+    a=reps[l][0];b=reps[l][1];c=reps[l][2];
+    var o=l*per;
+    if(c!==0){
+      var ic=inv[c];
+      for(y=0;y<q;y++){z=M[neg[A[a][M[b][y]]]][ic];flat[o++]=y*q+z;}
+      flat[o++]=q*q+M[neg[b]][ic];
+    }else if(b!==0){
+      y=M[neg[a]][inv[b]];
+      for(z=0;z<q;z++)flat[o++]=y*q+z;
+      flat[o++]=q*q+q;
+    }else{
+      for(z=0;z<q;z++)flat[o++]=q*q+z;
+      flat[o++]=q*q+q;
+    }
+  }
+
+  var m={q:q,flat:flat,per:per,ncard:n,nsym:n,percard:per,F:F,
+    scratch:new Uint8Array(n),pal:null,emo:(n<=EMOJI.length)};
+
+  return m;
+}
+
+/* Parien tarkistus on pakan rakentamisen raskain vaihe, ja sitä tarvitaan
+   vain Rakenne-välilehdellä. Lasketaan siis vasta pyydettäessä, jotta
+   pakan voi vaihtaa sujuvasti kesken liu'un vedon. */
+function statsOf(m){
+  if(m.stats)return m.stats;
+  var n=m.ncard,a,b,t;
+  var total=n*(n-1)/2,sampled=total>200000,t0=performance.now(),checked=0,ok=0;
+  if(sampled){
+    for(t=0;t<50000;t++){a=(Math.random()*n)|0;b=(Math.random()*(n-1))|0;if(b>=a)b++;
+      checked++;if(meetCount(m,a,b)===1)ok++;}
+  }else{
+    for(a=0;a<n;a++)for(b=a+1;b<n;b++){checked++;if(meetCount(m,a,b)===1)ok++;}
+  }
+  m.stats={total:total,checked:checked,ok:ok,sampled:sampled,
+    ms:Math.max(1,Math.round(performance.now()-t0))};
+  return m.stats;
+}
+
+function syms(m,c){return m.flat.subarray(c*m.per,(c+1)*m.per);}
+
+function meetCount(m,a,b){
+  var sa=syms(m,a),sb=syms(m,b),s=m.scratch,i,n=0;
+  for(i=0;i<sb.length;i++)s[sb[i]]=1;
+  for(i=0;i<sa.length;i++)if(s[sa[i]])n++;
+  for(i=0;i<sb.length;i++)s[sb[i]]=0;
+  return n;
+}
+
+function shared(m,a,b){
+  if(a===b)return null;
+  var sa=syms(m,a),sb=syms(m,b),s=m.scratch,i,hit=-1;
+  for(i=0;i<sb.length;i++)s[sb[i]]=1;
+  for(i=0;i<sa.length;i++)if(s[sa[i]]){hit=sa[i];break;}
+  for(i=0;i<sb.length;i++)s[sb[i]]=0;
+  return hit<0?null:hit;
+}
+
+/* ================= kuvasto =================
+   Emoji tunnistetaan silmäyksellä paljon nopeammin kuin piirretyt kuviot,
+   joten niitä käytetään aina kun niitä riittää koko pakkaan (enintään
+   1102 kuvaa). Sitä isommat pakat käyttävät piirrettyjä yhdistelmiä. */
+var EMOJI="🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🙈 🙉 🙊 🐔 🐧 🐦 🐤 🐣 🐥 🦆 🦅 🦉 🦇 🐺 🐗 🐴 🦄 🐝 🪱 🐛 🦋 🐌 🐞 🐜 🪰 🪲 🪳 🦟 🦗 🕷️ 🕸️ 🦂 🐢 🐍 🦎 🦖 🦕 🐙 🦑 🦐 🦞 🦀 🐡 🐠 🐟 🐬 🐳 🐋 🦈 🦭 🐊 🐅 🐆 🦓 🦍 🦧 🦣 🐘 🦛 🦏 🐪 🐫 🦒 🦘 🦬 🐃 🐂 🐄 🐎 🐖 🐏 🐑 🦙 🐐 🦌 🐕 🐩 🦮 🐈 🪶 🐓 🦃 🦤 🦚 🦜 🦢 🦩 🕊️ 🐇 🦝 🦨 🦡 🦫 🦦 🦥 🐁 🐀 🐿️ 🦔 🐾 🐉 🐲 🫎 🫏 🐕‍🦺 🌵 🎄 🌲 🌳 🌴 🪵 🌱 🌿 ☘️ 🍀 🎍 🪴 🎋 🍃 🍂 🍁 🍄 🐚 🪸 🪨 🌾 💐 🌷 🌹 🥀 🪻 🪷 🌺 🌸 🌼 🌻 🪹 🪺 🌰 🍇 🍈 🍉 🍊 🍋 🍌 🍍 🥭 🍎 🍏 🍐 🍑 🍒 🍓 🫐 🥝 🍅 🫒 🥥 🥑 🍆 🥔 🥕 🌽 🌶️ 🫑 🥒 🥬 🥦 🧄 🧅 🥜 🫘 🫚 🫛 🍞 🥐 🥖 🫓 🥨 🥯 🥞 🧇 🧀 🍖 🍗 🥩 🥓 🍔 🍟 🍕 🌭 🥪 🌮 🌯 🫔 🥙 🧆 🥚 🍳 🥘 🍲 🫕 🥣 🥗 🍿 🧈 🧂 🥫 🍱 🍘 🍙 🍚 🍛 🍜 🍝 🍠 🍢 🍣 🍤 🍥 🥮 🍡 🥟 🥠 🥡 🦪 🍦 🍧 🍨 🍩 🍪 🎂 🍰 🧁 🥧 🍫 🍬 🍭 🍮 🍯 🍼 🥛 ☕ 🫖 🍵 🍶 🍾 🍷 🍸 🍹 🍺 🍻 🥂 🥃 🫗 🥤 🧋 🧃 🧉 🧊 🥢 🍽️ 🍴 🥄 🔪 🫙 🏺 🍋‍🟩 🌍 🌎 🌏 🗺️ 🗾 🧭 🏔️ ⛰️ 🌋 🗻 🏕️ 🏖️ 🏜️ 🏝️ 🏞️ 🏟️ 🏛️ 🏗️ 🧱 🪟 🛖 🏘️ 🏚️ 🏠 🏡 🏢 🏣 🏤 🏥 🏦 🏨 🏩 🏪 🏫 🏬 🏭 🏯 🏰 💒 🗼 🗽 ⛩️ 🕌 🕍 🛕 ⛪ ⛲ ⛺ 🌁 🌃 🏙️ 🌄 🌅 🌆 🌇 🌉 🎠 🛝 🎡 🎢 💈 🎪 🛗 🚂 🚃 🚄 🚅 🚆 🚇 🚈 🚉 🚊 🚝 🚞 🚋 🚌 🚍 🚎 🚐 🚑 🚒 🚓 🚔 🚕 🚖 🚗 🚘 🚙 🛻 🚚 🚛 🚜 🏎️ 🏍️ 🛵 🦽 🦼 🛺 🚲 🛴 🛹 🛼 🚏 🛣️ 🛤️ 🛢️ ⛽ 🛞 🚨 🚦 🛑 🚧 ⚓ 🛟 ⛵ 🛶 🚤 🛳️ ⛴️ 🛥️ 🚢 ✈️ 🛩️ 🛫 🛬 🪂 💺 🚁 🚟 🚠 🚡 🛰️ 🚀 🛸 🛜 ⌚ 📱 💻 ⌨️ 🖥️ 🖨️ 🖱️ 🖲️ 🕹️ 🗜️ 💽 💾 💿 📀 📼 📷 📸 📹 🎥 📽️ 🎞️ 📞 ☎️ 📟 📠 📺 📻 🎙️ 🎚️ 🎛️ ⏱️ ⏲️ ⏰ 🕰️ ⌛ ⏳ 📡 🔋 🪫 🔌 💡 🔦 🕯️ 🪔 🧯 💸 💵 💴 💶 💷 🪙 💰 💳 🪪 💎 ⚖️ 🪜 🧰 🪛 🔧 🔨 ⚒️ 🛠️ ⛏️ 🪚 🔩 ⚙️ 🪤 ⛓️ 🧲 🔫 💣 🧨 🪓 🗡️ ⚔️ 🛡️ 🚬 ⚰️ 🪦 ⚱️ 🔮 📿 🧿 🪬 ⚗️ 🔭 🔬 🕳️ 🩻 🩹 🩺 💊 💉 🩸 🧬 🦠 🧫 🧪 🌡️ 🧹 🪠 🧺 🧻 🚽 🚰 🚿 🛁 🛀 🧼 🪥 🪒 🧽 🪣 🧴 🛎️ 🔑 🗝️ 🚪 🪑 🛋️ 🛏️ 🛌 🧸 🪆 🖼️ 🪞 🛍️ 🛒 🎁 🎈 🎏 🎀 🪄 🪅 🎊 🎉 🎎 🏮 🎐 🧧 ✉️ 📩 📨 📧 💌 📥 📤 📦 🏷️ 🪧 📪 📫 📬 📭 📮 📯 📜 📃 📄 📑 🧾 📊 📈 📉 🗒️ 🗓️ 📆 📅 🗑️ 📇 🗃️ 🗳️ 🗄️ 📋 📁 📂 🗂️ 🗞️ 📰 📓 📔 📒 📕 📗 📘 📙 📚 📖 🔖 🧷 🔗 📎 🖇️ 📐 📏 🧮 📌 📍 ✂️ 🖊️ 🖋️ ✒️ 🖌️ 🖍️ 📝 ✏️ 🔍 🔎 🔏 🔐 🔒 🔓 🪝 🪮 🩼 🫧 🪽 🪿 👓 🕶️ 🥽 🥼 🦺 👔 👕 👖 🧣 🧤 🧥 🧦 👗 👘 🥻 🩱 🩲 🩳 👙 👚 🪭 👛 👜 👝 🎒 🩴 👞 👟 🥾 🥿 👠 👡 🩰 👢 👑 👒 🎩 🎓 🧢 🪖 ⛑️ 💄 💍 💼 ⚽ ⚾ 🥎 🏀 🏐 🏈 🏉 🎾 🥏 🎳 🏏 🏑 🏒 🥍 🏓 🏸 🥊 🥋 🥅 ⛳ ⛸️ 🎣 🤿 🎽 🎿 🛷 🥌 🎯 🪀 🪁 🎱 🎮 🎰 🎲 🧩 ♟️ 🃏 🀄 🎴 🎭 🎨 🧵 🪡 🧶 🪢 🏆 🥇 🥈 🥉 🏅 🎖️ 🏵️ 🎗️ 🎫 🎟️ 🎼 🎵 🎶 🎤 🎧 🎷 🪗 🎸 🎹 🎺 🎻 🪕 🥁 🪘 🪇 🪈 ☀️ 🌤️ ⛅ 🌥️ ☁️ 🌦️ 🌧️ ⛈️ 🌩️ 🌨️ ❄️ ☃️ ⛄ 🌬️ 💨 🌪️ 🌫️ 🌈 ☔ 💧 💦 🌊 🔥 ✨ ⭐ 🌟 💫 ⚡ ☄️ 💥 🌙 🌛 🌜 🌚 🌝 🌞 🪐 🌠 🌌 🌑 🌒 🌓 🌔 🌕 🌖 🌗 🌘 🕐 🕑 🕒 🕓 🕔 🕕 🕖 🕗 🕘 🕙 🕚 🕛 🕜 🕝 🕞 🕟 🕠 🕡 🕢 🕣 🕤 🕥 🕦 🕧 👋 🤚 🖐️ ✋ 🖖 👌 🤌 🤏 ✌️ 🤞 🫰 🤟 🤘 🤙 🫵 🫱 🫲 🫳 🫴 🫸 🫷 👈 👉 👆 👇 ☝️ 👍 👎 ✊ 👊 🤛 🤜 👏 🙌 🫶 👐 🤲 🤝 🙏 ✍️ 💅 🤳 💪 🦾 🦿 🦵 🦶 👂 🦻 👃 🧠 🫀 🫁 🦷 🦴 👀 👁️ 👅 👄 🫦 😀 😃 😄 😁 😆 😅 🤣 😂 🙂 🙃 😉 😊 😇 🥰 😍 🤩 😘 😗 😚 😙 🥲 😋 😛 😜 🤪 😝 🤑 🤗 🤭 🫢 🫣 🤫 🤔 🫡 🤐 🤨 😐 😑 😶 🫥 😏 😒 🙄 😬 😮‍💨 🤥 😌 😔 😪 🤤 😴 😷 🤒 🤕 🤢 🤮 🤧 🥵 🥶 🥴 😵 😵‍💫 🤯 🤠 🥳 🥸 😎 🤓 🧐 😕 🫤 😟 🙁 ☹️ 😮 😯 😲 😳 🥺 🥹 😦 😧 😨 😰 😥 😢 😭 😱 😖 😣 😞 😓 😩 😫 🥱 😤 😡 😠 🤬 😈 👿 💀 ☠️ 💩 🤡 👹 👺 👻 👽 👾 🤖 😺 😸 😹 😻 😼 😽 🙀 😿 😾 🎃 👶 🧒 👦 👧 🧑 👨 👩 🧓 👴 👵 🙍 🙎 🙅 🙆 💁 🙋 🧏 🙇 🤦 🤷 👮 🕵️ 💂 🥷 👷 🤴 👸 🦸 🦹 🧙 🧚 🧛 🧜 🧝 🧞 🧟 🧌 🎅 🤶 👼 🤱 🏃 🚶 🧎 🧍 🕺 💃 🕴️ 🤺 🏇 ⛷️ 🏂 🏌️ 🏄 🚣 🏊 ⛹️ 🏋️ 🚴 🚵 🤸 🤼 🤽 🤾 🤹 🧘 ❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 ❤️‍🔥 ❤️‍🩹 🩷 🩵 🩶 ♠️ ♥️ ♦️ ♣️ 🏁 🚩 🎌 🏴 🏳️".split(" ");
+
+/* Askel, joka käy koko listan läpi osumatta samaan kahdesti. */
+var ESTRIDE=(function(){
+  var n=EMOJI.length,k=Math.round(n*0.382);
+  function gcd(a,b){while(b){var t=a%b;a=b;b=t;}return a;}
+  while(gcd(k,n)!==1)k++;
+  return k;
+})();
+
+/* off = matsikohtainen siirtymä. Askel on jaoton listan pituuden kanssa,
+   joten eri kuvat pysyvät eri kuvina siirtymästä riippumatta — mutta
+   valikoima vaihtuu joka pelissä. */
+function emoHTML(i,size,faded,off){
+  var st=(size==null)?"":' style="font-size:'+size+'px"';
+  return '<span class="emo'+(faded?" fade":"")+'"'+st+">"+
+    EMOJI[(i*ESTRIDE+(off||0))%EMOJI.length]+"</span>";
+}
+
+/* Kortilla ja tekstin seassa käytetään samaa valintaa. */
+function symInline(m,i,off){
+  return m&&m.emo?emoHTML(i,20,false,off):glyph(i,22,false,off);
+}
+
+/* ---- piirretyt kuviot isoille pakoille ----
+   18 muotoa × 16 sävyä × 4 täyttöä × 9 sisämerkkiä = 10368 kuvaa.
+   Suurin pakka tarvitsee 9507. */
+var SHAPES=[
+ {d:"M12 2A10 10 0 1 1 11.9 2Z"},
+ {d:"M3.2 3.2H20.8V20.8H3.2Z"},
+ {d:"M12 2L21.7 19.5H2.3Z"},
+ {d:"M12 22L2.3 4.5H21.7Z"},
+ {d:"M12 1.6L22.4 12L12 22.4L1.6 12Z"},
+ {d:"M12 1.5L22 8.8L18.2 20.5H5.8L2 8.8Z"},
+ {d:"M12 1.5L21.1 6.8V17.2L12 22.5L2.9 17.2V6.8Z"},
+ {d:"M12 1L14.7 8.28L22.46 8.6L16.37 13.42L18.47 20.9L12 16.6L5.53 20.9L7.63 13.42L1.54 8.6L9.3 8.28Z"},
+ {d:"M12 1L15.05 6.72L21.53 6.5L18.1 12L21.53 17.5L15.05 17.28L12 23L8.95 17.28L2.47 17.5L5.9 12L2.47 6.5L8.95 6.72Z"},
+ {d:"M9.6 2.2H14.4V9.6H21.8V14.4H14.4V21.8H9.6V14.4H2.2V9.6H9.6Z"},
+ {d:"M9.6 2.2H14.4V9.6H21.8V14.4H14.4V21.8H9.6V14.4H2.2V9.6H9.6Z",rot:45},
+ {d:"M12 1.8C12 1.8 20.5 11 20.5 15.3A8.5 8.5 0 1 1 3.5 15.3C3.5 11 12 1.8 12 1.8Z"},
+ {d:"M12 21.6C12 21.6 2.4 15.2 2.4 8.9A4.9 4.9 0 0 1 12 6.9A4.9 4.9 0 0 1 21.6 8.9C21.6 15.2 12 21.6 12 21.6Z"},
+ {d:"M12 2L21.5 12H16.6V22H7.4V12H2.5Z"},
+ {d:"M16.02 2.3L21.7 7.98V16.02L16.02 21.7H7.98L2.3 16.02V7.98L7.98 2.3Z"},
+ {d:"M6.5 3.5H17.5L22 20.5H2Z"},
+ {d:"M2 17A10 10 0 0 1 22 17Z"},
+ {d:"M4.5 2.5H19.5L12 12L19.5 21.5H4.5L12 12Z"}
+];
+var HUES=["hsl(2,72%,53%)","hsl(20,78%,48%)","hsl(36,82%,46%)","hsl(50,80%,42%)",
+ "hsl(68,55%,38%)","hsl(92,52%,38%)","hsl(120,50%,34%)","hsl(150,55%,34%)",
+ "hsl(172,62%,34%)","hsl(190,66%,40%)","hsl(206,72%,46%)","hsl(224,62%,52%)",
+ "hsl(248,55%,56%)","hsl(272,50%,52%)","hsl(300,48%,46%)","hsl(330,62%,48%)"];
+var PAPER="#F6F3EA";
+var NS=SHAPES.length,NH=HUES.length,NF=4,NM=9,COMBOS=NS*NH*NF*NM;
+
+function glyph(i,size,faded,off){
+  var j=(i*1103+(off||0))%COMBOS;
+  var hue=HUES[j%NH];
+  var sh=SHAPES[Math.floor(j/NH)%NS];
+  var fill=Math.floor(j/(NH*NS))%NF;
+  var mark=Math.floor(j/(NH*NS*NF))%NM;
+  var col=faded?"#B8B4A8":hue;
+  var ink=(fill===1)?col:PAPER;
+  var body;
+  if(fill===1)
+    body='<path d="'+sh.d+'" fill="none" stroke="'+col+'" stroke-width="2.8" stroke-linejoin="round"/>';
+  else if(fill===3)
+    body='<path d="'+sh.d+'" fill="none" stroke="'+col+'" stroke-width="2.4" stroke-linejoin="round"/>'+
+         '<path d="'+sh.d+'" fill="'+col+'" transform="translate(6 6) scale(0.5)"/>';
+  else
+    body='<path d="'+sh.d+'" fill="'+col+'"'+(fill===2?' stroke="'+PAPER+'" stroke-width="2.6"':'')+
+         ' stroke-linejoin="round"/>';
+  if(sh.rot)body='<g transform="rotate('+sh.rot+' 12 12)">'+body+'</g>';
+  var mk="";
+  if(mark===1)mk='<circle cx="12" cy="12" r="2.6" fill="'+ink+'"/>';
+  else if(mark===2)mk='<rect x="7.6" y="10.8" width="8.8" height="2.4" rx="1.2" fill="'+ink+'"/>';
+  else if(mark===3)mk='<circle cx="12" cy="12" r="3.4" fill="none" stroke="'+ink+'" stroke-width="1.9"/>';
+  else if(mark===4)mk='<g fill="'+ink+'"><rect x="10.8" y="7.8" width="2.4" height="8.4" rx="1.2"/>'+
+    '<rect x="7.8" y="10.8" width="8.4" height="2.4" rx="1.2"/></g>';
+  else if(mark===5)mk='<g fill="'+ink+'"><circle cx="8.9" cy="12" r="1.9"/><circle cx="15.1" cy="12" r="1.9"/></g>';
+  else if(mark===6)mk='<rect x="10.8" y="7.6" width="2.4" height="8.8" rx="1.2" fill="'+ink+'"/>';
+  else if(mark===7)mk='<rect x="9.4" y="9.4" width="5.2" height="5.2" rx="1.1" fill="'+ink+'"/>';
+  else if(mark===8)mk='<path d="M12 8.6L15.6 15.1H8.4Z" fill="'+ink+'"/>';
+  return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 24 24"'+(faded?' opacity=".35"':'')+'>'+
+    body+mk+'</svg>';
+}
+
+/* ================= kortti ================= */
+function rnd(seed){
+  var t=(seed+0x6d2b79f5)|0;
+  t=Math.imul(t^(t>>>15),t|1);
+  t^=t+Math.imul(t^(t>>>7),t|61);
+  return ((t^(t>>>14))>>>0)/4294967296;
+}
+var GOLDEN=2.39996323;
+var MARG=0.022;          /* rako kortin reunaan */
+var KUVAVARA=0.94;       /* hengitystila kuvien välissä */
+
+/* ---- kuvien sijoittelu ----
+   Auringonkukkaspiraali jättää pisteet liian lähelle toisiaan: kuvat
+   menivät päällekkäin. Spiraalista lähdetään liikkeelle ja pisteitä
+   työnnetään erilleen kunnes ne asettuvat tasaisesti. Tulos lasketaan
+   kerran kutakin kuvamäärää kohti ja muistetaan. */
+var LAY={};
+
+function minDist(P){
+  var m=1e9,i,j,n=P.length;
+  for(i=0;i<n;i++)for(j=i+1;j<n;j++){
+    var dx=P[i][0]-P[j][0],dy=P[i][1]-P[j][1],d=dx*dx+dy*dy;
+    if(d<m)m=d;
+  }
+  return Math.sqrt(m);
+}
+
+function normP(P){
+  var mx=0,i,r;
+  for(i=0;i<P.length;i++){r=Math.sqrt(P[i][0]*P[i][0]+P[i][1]*P[i][1]);if(r>mx)mx=r;}
+  if(mx>0)for(i=0;i<P.length;i++){P[i][0]/=mx;P[i][1]/=mx;}
+  return P;
+}
+
+function layout(n){
+  if(LAY[n])return LAY[n];
+  var P=[],i,j,k;
+  if(n===1)P=[[0,0]];
+  else{
+    for(k=0;k<n;k++){
+      var r=Math.sqrt((k+0.5)/n),th=k*GOLDEN;
+      P.push([r*Math.cos(th),r*Math.sin(th)]);
+    }
+    normP(P);
+    var iters=Math.max(60,Math.round(9000/n));
+    for(var it=0;it<iters;it++){
+      var t=minDist(P)*1.03;
+      for(i=0;i<n;i++)for(j=i+1;j<n;j++){
+        var dx=P[j][0]-P[i][0],dy=P[j][1]-P[i][1];
+        var d=Math.sqrt(dx*dx+dy*dy)||1e-9;
+        if(d<t){
+          var f=(t-d)*0.25,ux=dx/d,uy=dy/d;
+          P[i][0]-=ux*f;P[i][1]-=uy*f;
+          P[j][0]+=ux*f;P[j][1]+=uy*f;
+        }
+      }
+      for(i=0;i<n;i++){
+        var m2=Math.sqrt(P[i][0]*P[i][0]+P[i][1]*P[i][1]);
+        if(m2>1){P[i][0]/=m2;P[i][1]/=m2;}
+      }
+    }
+    normP(P);
+  }
+  /* c = pienin keskipisteiden väli, kun uloin piste on säteellä 1.
+     Kuvan halkaisija d ja pisteiden säde R ratkeavat siitä:
+     d <= c*R  ja  R + d/2 <= 0.5 - MARG. */
+  var c=(n>1)?minDist(P):2;
+  var d=c*(0.5-MARG)/(1+c/2);
+  LAY[n]={P:P,d:d,R:(0.5-MARG)-d/2};
+  return LAY[n];
+}
+
+function cardHTML(m,card,w,o){
+  o=o||{};
+  var n=m.percard,L=layout(n);
+  var seed=o.seed||0;
+  var spin=rnd((seed+card)*7+3)*Math.PI*2;
+  var flip=rnd((seed+card)*7+11)<0.5?1:-1;
+  var cs=Math.cos(spin),sn=Math.sin(spin);
+  var list=syms(m,card),out="",k;
+
+  /* Kuvat arvotaan eri paikkoihin joka kortilla, jottei sama kuva
+     olisi aina samassa kohdassa. */
+  var slot=[];
+  for(k=0;k<n;k++)slot.push(k);
+  for(k=n-1;k>0;k--){
+    var r2=Math.floor(rnd((seed+card)*97+k)*(k+1)),tmp=slot[k];
+    slot[k]=slot[r2];slot[r2]=tmp;
+  }
+
+  for(k=0;k<list.length;k++){
+    var s=list[k],sd=(seed+card)*131+k*17,p=L.P[slot[k]];
+    var x=(p[0]*cs-p[1]*sn)*flip, y=p[0]*sn+p[1]*cs;
+    /* KUVAVALJA jättää kuvien väliin näkyvän raon: ilman sitä ne
+       koskettaisivat toisiaan täsmälleen. */
+    var sc=(0.90+rnd(sd+31)*0.14)*KUVAVARA;
+    var rot=(rnd(sd+19)*2-1)*30;
+    var isM=(o.match===s),faded=o.dim&&!isM;
+    var base=w*L.d*sc;
+    /* Koko annetaan paikalle, ei sisällölle: näin korostuskehä voidaan
+       mitoittaa em-yksiköin ja se pysyy ympyränä riippumatta siitä,
+       kuinka leveän laatikon emojikirjasin varaa. */
+    /* Kierto on sisemmässä kääreessä, ei paikassa. Jos kehä kiertyisi
+       kuvan mukana, pienikin keskityksen poikkeama pyörisi eri suuntaan
+       joka kuvalla ja näyttäisi siltä ettei kehä ole keskellä. */
+    var st="left:"+(50+x*L.R*100).toFixed(2)+"%;top:"+(50+y*L.R*100).toFixed(2)+
+      "%;font-size:"+Math.max(5,base).toFixed(1)+
+      "px;transform:translate(-50%,-50%)";
+    var tag=o.tap?"button":"span";
+    /* Emoji täyttää neliönsä lähes kokonaan, piirretty kuvio noin 87 %:sti,
+       joten sama näkyvä koko vaatii eri kertoimen. */
+    /* Himmennys tulee luokasta, joten sitä voi vaihtaa piirtämättä uusiksi. */
+    var kuva=m.emo?emoHTML(s,null,false,o.off)
+                  :glyph(s,Math.max(5,base*1.06).toFixed(1),false,o.off);
+    /* data-s aina mukana: korostus ja himmennys tehdään luokkia vaihtamalla,
+       jolloin paljastus ei vaadi korttien piirtämistä uusiksi. */
+    out+="<"+tag+' class="slot'+(isM?" hit":"")+(faded?" dim":"")+
+      '" style="'+st+'" data-s="'+s+'"'+
+      '><span class="gl" style="transform:rotate('+rot.toFixed(1)+'deg)">'+kuva+"</span>"+
+      (isM?'<i class="ring"></i>':"")+"</"+tag+">";
+  }
+  if(o.label!=null)out+='<span class="cno" style="font-size:'+Math.max(6,w*.052).toFixed(1)+'px">'+o.label+"</span>";
+  return out;
+}
+
+
+/* ================= QR-koodi =================
+   Tavutila, virheenkorjaustaso M, versiot 1-10. Toteutettu itse, jotta
+   sovellus ei tarvitse ulkoista kirjastoa eikä verkkoyhteyttä. */
+
+/* [ec-sanoja/lohko, ryhmä1 lohkoja, ryhmä1 datasanoja, ryhmä2 lohkoja, ryhmä2 datasanoja] */
+var QR_M=[null,
+ [10,1,16,0,0],[16,1,28,0,0],[26,1,44,0,0],[18,2,32,0,0],[24,2,43,0,0],
+ [16,4,27,0,0],[18,4,31,0,0],[22,2,38,2,39],[22,3,36,2,37],[26,4,43,1,44]];
+var QR_ALIGN=[null,[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50]];
+
+var GEXP=new Uint8Array(512),GLOG=new Uint8Array(256);
+(function(){
+  var x=1;
+  for(var i=0;i<255;i++){GEXP[i]=x;GLOG[x]=i;x<<=1;if(x&0x100)x^=0x11D;}
+  for(i=255;i<512;i++)GEXP[i]=GEXP[i-255];
+})();
+function gmul(a,b){return (a&&b)?GEXP[GLOG[a]+GLOG[b]]:0;}
+
+function rsGen(n){
+  var p=[1],i,j;
+  for(i=0;i<n;i++){
+    var q=p.concat([0]);
+    for(j=0;j<p.length;j++)q[j+1]^=gmul(p[j],GEXP[i]);
+    p=q;
+  }
+  return p;
+}
+function rsEnc(data,n){
+  var gen=rsGen(n),res=new Array(n).fill(0),i,j;
+  for(i=0;i<data.length;i++){
+    var f=data[i]^res[0];
+    res.shift();res.push(0);
+    if(f)for(j=0;j<n;j++)res[j]^=gmul(gen[j+1],f);
+  }
+  return res;
+}
+
+function qrEncode(text){
+  /* UTF-8 tavuiksi */
+  var bytes=[],i,c;
+  for(i=0;i<text.length;i++){
+    c=text.charCodeAt(i);
+    if(c<0x80)bytes.push(c);
+    else if(c<0x800)bytes.push(0xC0|c>>6,0x80|c&63);
+    else bytes.push(0xE0|c>>12,0x80|(c>>6)&63,0x80|c&63);
+  }
+  /* pienin versio johon mahtuu */
+  var ver=0;
+  for(i=1;i<=10;i++){
+    var t=QR_M[i],cap=t[1]*t[2]+t[3]*t[4];
+    var hdr=4+((i<10)?8:16);
+    if(bytes.length*8+hdr<=cap*8){ver=i;break;}
+  }
+  if(!ver)return null;
+
+  var T=QR_M[ver],dataWords=T[1]*T[2]+T[3]*T[4];
+  var bits=[];
+  function push(v,n){for(var k=n-1;k>=0;k--)bits.push((v>>k)&1);}
+  push(4,4);
+  push(bytes.length,(ver<10)?8:16);
+  for(i=0;i<bytes.length;i++)push(bytes[i],8);
+  var rest=dataWords*8-bits.length;
+  push(0,Math.min(4,rest));
+  while(bits.length%8)bits.push(0);
+  var pads=[0xEC,0x11],pi=0;
+  while(bits.length<dataWords*8){push(pads[pi&1],8);pi++;}
+
+  var words=[];
+  for(i=0;i<bits.length;i+=8){
+    var b=0;for(var k=0;k<8;k++)b=(b<<1)|bits[i+k];
+    words.push(b);
+  }
+
+  /* lohkot ja virheenkorjaus */
+  var blocks=[],ecs=[],pos=0;
+  function addBlocks(cnt,len){
+    for(var b=0;b<cnt;b++){
+      var d=words.slice(pos,pos+len);pos+=len;
+      blocks.push(d);ecs.push(rsEnc(d,T[0]));
+    }
+  }
+  addBlocks(T[1],T[2]);
+  if(T[3])addBlocks(T[3],T[4]);
+
+  /* lomitus */
+  var out=[],maxD=Math.max(T[2],T[4]||0);
+  for(i=0;i<maxD;i++)for(var b=0;b<blocks.length;b++)
+    if(i<blocks[b].length)out.push(blocks[b][i]);
+  for(i=0;i<T[0];i++)for(b=0;b<ecs.length;b++)out.push(ecs[b][i]);
+
+  /* moduulit */
+  var size=17+ver*4;
+  var M=[],F=[];
+  for(i=0;i<size;i++){M.push(new Uint8Array(size));F.push(new Uint8Array(size));}
+  function setF(x,y,v){if(x>=0&&y>=0&&x<size&&y<size){M[y][x]=v;F[y][x]=1;}}
+
+  function finder(cx,cy){
+    for(var dy=-1;dy<=7;dy++)for(var dx=-1;dx<=7;dx++){
+      var x=cx+dx,y=cy+dy;
+      if(x<0||y<0||x>=size||y>=size)continue;
+      var on=(dx>=0&&dx<=6&&(dy===0||dy===6))||(dy>=0&&dy<=6&&(dx===0||dx===6))||
+             (dx>=2&&dx<=4&&dy>=2&&dy<=4);
+      setF(x,y,on?1:0);
+    }
+  }
+  finder(0,0);finder(size-7,0);finder(0,size-7);
+
+  var al=QR_ALIGN[ver];
+  for(i=0;i<al.length;i++)for(var jj=0;jj<al.length;jj++){
+    var ax=al[i],ay=al[jj];
+    if((ax<8&&ay<8)||(ax<8&&ay>size-9)||(ax>size-9&&ay<8))continue;
+    for(var dy2=-2;dy2<=2;dy2++)for(var dx2=-2;dx2<=2;dx2++)
+      setF(ax+dx2,ay+dy2,(Math.max(Math.abs(dx2),Math.abs(dy2))!==1)?1:0);
+  }
+
+  for(i=8;i<size-8;i++){setF(i,6,(i%2===0)?1:0);setF(6,i,(i%2===0)?1:0);}
+  setF(8,size-8,1);
+  for(i=0;i<9;i++){setF(i,8,F[8][i]?M[8][i]:0);setF(8,i,F[i][8]?M[i][8]:0);}
+  for(i=0;i<8;i++){setF(size-1-i,8,0);setF(8,size-1-i,0);}
+  for(i=0;i<9;i++){if(!F[8][i])setF(i,8,0);if(!F[i][8])setF(8,i,0);}
+
+  if(ver>=7){
+    var vd=ver<<12,vv=ver<<12;
+    for(i=0;i<6;i++)if(vd>>>(17-i)&1||true){}
+    vd=ver<<12;
+    for(i=17;i>=12;i--)if((vd>>>i)&1)vd^=0x1F25<<(i-12);
+    vv=(ver<<12)|vd;
+    for(i=0;i<18;i++){
+      var bit=(vv>>>i)&1;
+      setF(Math.floor(i/3),size-11+(i%3),bit);
+      setF(size-11+(i%3),Math.floor(i/3),bit);
+    }
+  }
+
+  /* data siksakina */
+  function place(mask){
+    var G=[];for(var y=0;y<size;y++)G.push(Uint8Array.from(M[y]));
+    var idx=0,bit=0,dir=-1,col=size-1;
+    while(col>0){
+      if(col===6)col--;
+      for(var yy=(dir<0?size-1:0);yy>=0&&yy<size;yy+=dir){
+        for(var c=0;c<2;c++){
+          var x=col-c;
+          if(F[yy][x])continue;
+          var v=0;
+          if(idx<out.length)v=(out[idx]>>>(7-bit))&1;
+          bit++;if(bit===8){bit=0;idx++;}
+          var m;
+          switch(mask){
+            case 0:m=(yy+x)%2===0;break;
+            case 1:m=yy%2===0;break;
+            case 2:m=x%3===0;break;
+            case 3:m=(yy+x)%3===0;break;
+            case 4:m=(Math.floor(yy/2)+Math.floor(x/3))%2===0;break;
+            case 5:m=((yy*x)%2)+((yy*x)%3)===0;break;
+            case 6:m=((((yy*x)%2)+((yy*x)%3))%2)===0;break;
+            default:m=((((yy+x)%2)+((yy*x)%3))%2)===0;
+          }
+          G[yy][x]=m?(v^1):v;
+        }
+      }
+      dir=-dir;col-=2;
+    }
+    /* muotoilutieto */
+    var fmt=(0<<3)|mask;                 /* 00 = taso M */
+    var d=fmt<<10;
+    for(var k=14;k>=10;k--)if((d>>>k)&1)d^=0x537<<(k-10);
+    var f=((fmt<<10)|d)^0x5412;
+    for(k=0;k<15;k++){
+      var b2=(f>>>k)&1;
+      if(k<6)G[k][8]=b2;
+      else if(k<8)G[k+1][8]=b2;
+      else if(k===8)G[8][7]=b2;
+      else G[8][14-k]=b2;
+      if(k<8)G[8][size-1-k]=b2;
+      else G[size-15+k][8]=b2;
+    }
+    G[size-8][8]=1;
+    return G;
+  }
+
+  function penalty(G){
+    var p=0,n=size,x,y,run,i2;
+    for(y=0;y<n;y++){run=1;for(x=1;x<n;x++){
+      if(G[y][x]===G[y][x-1])run++;else{if(run>=5)p+=3+(run-5);run=1;}}
+      if(run>=5)p+=3+(run-5);}
+    for(x=0;x<n;x++){run=1;for(y=1;y<n;y++){
+      if(G[y][x]===G[y-1][x])run++;else{if(run>=5)p+=3+(run-5);run=1;}}
+      if(run>=5)p+=3+(run-5);}
+    for(y=0;y<n-1;y++)for(x=0;x<n-1;x++){
+      var s=G[y][x]+G[y][x+1]+G[y+1][x]+G[y+1][x+1];
+      if(s===0||s===4)p+=3;}
+    var pat=[1,0,1,1,1,0,1];
+    function look(get){
+      var cnt=0;
+      for(var a=0;a<n;a++)for(var b=0;b+6<n;b++){
+        var ok=true;
+        for(i2=0;i2<7;i2++)if(get(a,b+i2)!==pat[i2]){ok=false;break;}
+        if(!ok)continue;
+        var pre=true,post=true;
+        for(i2=1;i2<=4;i2++){if(b-i2<0||get(a,b-i2)!==0)pre=false;}
+        for(i2=7;i2<11;i2++){if(b+i2>=n||get(a,b+i2)!==0)post=false;}
+        if(pre||post)cnt++;
+      }
+      return cnt;
+    }
+    p+=40*(look(function(a,b){return G[a][b];})+look(function(a,b){return G[b][a];}));
+    var dark=0;
+    for(y=0;y<n;y++)for(x=0;x<n;x++)dark+=G[y][x];
+    p+=10*Math.floor(Math.abs(dark*100/(n*n)-50)/5);
+    return p;
+  }
+
+  var best=null,bestP=1e18;
+  for(var mk=0;mk<8;mk++){
+    var G=place(mk),p=penalty(G);
+    if(p<bestP){bestP=p;best=G;}
+  }
+  return best;
+}
+
+
+/* Matriisi SVG:ksi. Vaakasuorat jonot yhdistetään yhdeksi poluksi,
+   jotta koodi pysyy pienenä. */
+var QRCACHE={};
+function qrSVG(text,px){
+  var m=QRCACHE[text];
+  if(m===undefined){m=qrEncode(text);QRCACHE[text]=m;}
+  if(!m)return "";
+  var n=m.length,q=2,W=n+q*2,d="",y,x,run;
+  for(y=0;y<n;y++){
+    x=0;
+    while(x<n){
+      if(m[y][x]){
+        run=1;
+        while(x+run<n&&m[y][x+run])run++;
+        d+="M"+(x+q)+" "+(y+q)+"h"+run+"v1h-"+run+"z";
+        x+=run;
+      }else x++;
+    }
+  }
+  return '<svg class="qr" viewBox="0 0 '+W+" "+W+'" width="'+px+'" height="'+px+
+    '" shape-rendering="crispEdges" aria-label="QR-koodi"><rect width="'+W+
+    '" height="'+W+'" fill="#F6F3EA"/><path d="'+d+'" fill="#111730"/></svg>';
+}
+
+/* ================= asetukset ================= */
+var SIZES=[2,3,4,5,7,8,9,11,13,17,23,31,41,49,61,73,83,97];  /* q → 3…98 kuvaa */
+var CARDS_MIN=5, CARDS_MAX=100, CARDS_STEP=5;
+/* SETTLE: kuinka kauan isäntä kerää rinnakkaisia vaatimuksia ennen ratkaisua.
+   160 ms riittää — lyhyemmällä oikea voittaja alkaisi mennä ohi. */
+/* REVEAL: kuinka kauan oikea vastaus jää näkyviin ennen seuraavaa korttia.
+   Sama luku määrää myös hetken, jolloin uusi kortti herää kaikilla. */
+var STALE=12000, BEAT=2500, REVEAL=1250, SETTLE=160, PENALTY=3000, FINALIZE=500;
+var LEAD=1600;   /* matsin ensimmäisen kortin varoaika, jotta kaikki ehtivät */
+/* Versionumero. Nostetaan aina kun pelin toiminta muuttuu niin, ettei
+   vanha ja uusi versio voi pelata yhdessä. */
+var PROTO=61;
+var APPVER="v"+PROTO;
+var LOBBY_TTL=120000;                /* tätä vanhempi aula siivotaan */
+var CODE_ABC="ABCDEFGHJKLMNPRSTUVXY";  /* ilman sekoittavia I O Q Z W */
+
+var NAMES=["Ilves","Kettu","Hirvi","Näätä","Saukko","Mäyrä","Karhu","Susi","Ahma","Poro",
+ "Kuikka","Tikka","Pöllö","Kurki","Haukka","Lokki","Tiira","Västäräkki"];
+
+/* Tunniste on VÄLILEHTIKOHTAINEN. localStorage jaetaan välilehtien kesken,
+   jolloin useampi välilehti olisi sama pelaaja ja isännän valinta rikkoutuisi. */
+function makeMe(){
+  var id=null,nm=null;
+  try{id=sessionStorage.getItem("dobble_id");}catch(e){}
+  try{nm=localStorage.getItem("dobble_name");}catch(e){}
+  if(!id){
+    id=Math.random().toString(36).slice(2,8)+Date.now().toString(36).slice(-4);
+    try{sessionStorage.setItem("dobble_id",id);}catch(e){}
+  }
+  if(!nm){
+    nm=NAMES[Math.floor(Math.random()*NAMES.length)]+" "+(10+Math.floor(Math.random()*90));
+    try{localStorage.setItem("dobble_name",nm);}catch(e){}
+  }
+  return {id:id,name:nm};
+}
+
+var RUNGS=[
+ {q:2},{q:3},{q:4},{q:5},
+ {q:6,st:"dead",why:"7 kuvaa kortilla vaatisi kertaluvun 6. Mahdoton: Tarry kävi 1901 läpi kaikki 6 × 6 -latinalaiset neliöt käsin eikä löytänyt kahta ortogonaalista — Eulerin 36 upseerin ongelma. Bruck–Ryser vahvisti tuloksen myöhemmin todistuksella."},
+ {q:7},{q:8},{q:9},
+ {q:10,st:"dead",why:"11 kuvaa kortilla vaatisi kertaluvun 10. Mahdoton, mutta se selvisi vasta 1989. Bruck–Ryser ei kaada sitä, koska 10 = 1² + 3², joten Lam, Thiel ja Swiercz joutuivat sulkemaan sen pois tyhjentävällä konehaulla — tuhansia CPU-tunteja."},
+ {q:11},
+ {q:12,st:"open",why:"13 kuvaa kortilla vaatisi kertaluvun 12. Ei tiedetä. Tämä on pienin avoin tapaus: kukaan ei ole löytänyt sellaista tasoa eikä todistanut sitä mahdottomaksi, ja tyhjentävä haku on nykymenetelmillä liian raskas."},
+ {q:13},{q:17},{q:23},{q:31},{q:41},{q:49},{q:61},{q:73},{q:83},{q:97},
+ {q:99,st:"open",why:"100 kuvaa kortilla vaatisi kertaluvun 99 = 9 · 11, joka ei ole alkuluvun potenssi — tunnettua konstruktiota ei siis ole. Mahdottomaksikaan sitä ei ole todistettu: 99 ≡ 3 (mod 4), joten Bruck–Ryser ei päde. Tapaus on avoin. Suurin rakennettavissa oleva alle sadan on 98."}
+];
+
+/* ================= juhlinta =================
+   Fanfaari syntetisoidaan, konfetit piirretään kankaalle ja voittajan nimi
+   zoomataan esiin pienellä viiveellä. Ei äänitiedostoja eikä kirjastoja. */
+var AC=null,MUTE=false;
+try{MUTE=localStorage.getItem("dobble_mute")==="1";}catch(e){}
+
+/* Selaimet estävät äänen ennen käyttäjän kosketusta, joten konteksti
+   avataan ensimmäisestä napautuksesta. */
+function audioOn(){
+  if(AC)return AC;
+  try{
+    var C=window.AudioContext||window.webkitAudioContext;
+    if(!C)return null;
+    AC=new C();
+  }catch(e){return null;}
+  return AC;
+}
+
+var G3=196.00,C4=261.63,G4=392.00,C5=523.25,D5=587.33,E5=659.25,G5=783.99,
+    A5=880.00,C6=1046.50,E6=1318.51,G6=1567.98;
+/* Neljä osaa: kutsu, korkeampi vastaus, nouseva juoksutus ja pitkä
+   loppusointu. Kesto 4,9 s. */
+var FANFAARI=[
+  /* 1. kutsu */
+  {f:G4,t:0.00,d:0.13,v:0.9},{f:C5,t:0.13,d:0.13,v:0.9},{f:E5,t:0.26,d:0.22,v:1.0},
+  {f:D5,t:0.52,d:0.13,v:0.85},{f:E5,t:0.65,d:0.13,v:0.85},{f:G5,t:0.78,d:0.13,v:0.95},
+  {f:E5,t:0.91,d:0.11,v:0.85},{f:G5,t:1.02,d:0.26,v:0.95},
+  /* 2. vastaus ylempää */
+  {f:C6,t:1.36,d:0.13,v:0.95},{f:G5,t:1.49,d:0.13,v:0.85},{f:E5,t:1.62,d:0.13,v:0.85},
+  {f:G5,t:1.75,d:0.24,v:0.95},
+  {f:A5,t:2.03,d:0.13,v:0.9},{f:G5,t:2.16,d:0.13,v:0.85},{f:E5,t:2.29,d:0.26,v:0.9},
+  /* 3. nouseva juoksutus */
+  {f:C5,t:2.62,d:0.10,v:0.8},{f:E5,t:2.72,d:0.10,v:0.82},{f:G5,t:2.82,d:0.10,v:0.85},
+  {f:C6,t:2.92,d:0.10,v:0.88},{f:E6,t:3.02,d:0.10,v:0.92},{f:G6,t:3.12,d:0.16,v:1.0},
+  /* 4. loppusointu */
+  {f:C6,t:3.34,d:1.45,v:1.0},{f:G5,t:3.34,d:1.45,v:0.6},
+  {f:E5,t:3.34,d:1.45,v:0.5},{f:C5,t:3.34,d:1.45,v:0.45},
+  /* basso */
+  {f:C4,t:0.00,d:0.30,v:0.5},{f:C4,t:1.36,d:0.30,v:0.5},
+  {f:G3,t:2.62,d:0.30,v:0.5},{f:C4,t:3.34,d:1.55,v:0.6}
+];
+
+function soita(){
+  if(MUTE)return;
+  var ac=audioOn();
+  if(!ac)return;
+  if(ac.state==="suspended"){try{ac.resume();}catch(e){}}
+  var t0=ac.currentTime+0.02;
+  var main=ac.createGain();
+  main.gain.value=0.22;
+  main.connect(ac.destination);
+  FANFAARI.forEach(function(n){
+    /* Kaksi hieman eri vireeseen viritettyä oskillaattoria antaa
+       torvimaisen soinnin ilman näytteitä. */
+    for(var k=0;k<2;k++){
+      var o=ac.createOscillator(),g=ac.createGain(),lp=ac.createBiquadFilter();
+      o.type=(n.f<300)?"triangle":"sawtooth";
+      o.frequency.value=n.f;
+      o.detune.value=(k?7:-7);
+      lp.type="lowpass";
+      lp.frequency.value=Math.min(6000,n.f*6);
+      var a=t0+n.t,vol=n.v*(k?0.45:0.55);
+      g.gain.setValueAtTime(0.0001,a);
+      g.gain.exponentialRampToValueAtTime(vol,a+0.012);
+      g.gain.exponentialRampToValueAtTime(vol*0.55,a+n.d*0.5);
+      g.gain.exponentialRampToValueAtTime(0.0001,a+n.d);
+      o.connect(lp);lp.connect(g);g.connect(main);
+      o.start(a);o.stop(a+n.d+0.03);
+    }
+  });
+  /* Kimallus juoksutuksen ja loppusoinnun päälle */
+  [[3.05,0.5,0.07],[3.30,1.5,0.11]].forEach(function(k){
+    var len=Math.floor(ac.sampleRate*k[1]);
+    var buf=ac.createBuffer(1,len,ac.sampleRate),ch=buf.getChannelData(0);
+    for(var i=0;i<len;i++)ch[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.2);
+    var ns=ac.createBufferSource(),ng=ac.createGain(),hp=ac.createBiquadFilter();
+    ns.buffer=buf;hp.type="highpass";hp.frequency.value=3200;
+    ng.gain.value=k[2];
+    ns.connect(hp);hp.connect(ng);ng.connect(main);
+    ns.start(t0+k[0]);
+  });
+}
+
+/* ---- konfetit ---- */
+var CVS=null,CTX=null,PART=[],RAF=null,CEND=0;
+var CCOL=["#FFC94A","#E0574F","#4ED07E","#4A90E2","#C254E3","#F6F3EA","#FF8A3D","#35B8D6"];
+
+function confettiCanvas(){
+  if(CVS)return CVS;
+  try{
+    CVS=document.createElement("canvas");
+    CVS.id="confetti";
+    document.body.appendChild(CVS);
+    CTX=CVS.getContext("2d");
+  }catch(e){CVS=null;}
+  return CVS;
+}
+
+var CT2=null;
+function konfetit(){
+  var cv=confettiCanvas();
+  if(!cv)return;
+  var W=window.innerWidth,H=window.innerHeight;
+  cv.width=W;cv.height=H;cv.hidden=false;
+  PART=[];
+  purkaus(W,H,1);
+  CEND=Date.now()+8000;
+  /* Toinen purkaus kesken fanfaarin, jottei ruutu ehdi tyhjentyä. */
+  clearTimeout(CT2);
+  CT2=setTimeout(function(){
+    if(!CVS||CVS.hidden)return;
+    purkaus(CVS.width,CVS.height,0.75);
+    CEND=Math.max(CEND,Date.now()+5000);
+    if(!RAF)RAF=requestAnimationFrame(piirraKonfetit);
+  },2600);
+  if(!RAF)RAF=requestAnimationFrame(piirraKonfetit);
+}
+
+function purkaus(W,H,voima){
+  var n=Math.round(Math.min(220,Math.round(W*H/2000))*voima);
+  for(var i=0;i<n;i++){
+    var reuna=Math.random()<0.5;
+    PART.push({
+      x:reuna?(Math.random()<0.5?0:W):Math.random()*W,
+      y:reuna?H*(0.25+Math.random()*0.4):-20-Math.random()*H*0.3,
+      vx:reuna?(Math.random()*7+3)*(Math.random()<0.5?1:-1)*0.6:(Math.random()-0.5)*2.5,
+      vy:reuna?-(Math.random()*9+7):Math.random()*2+1,
+      w:4+Math.random()*7,h:6+Math.random()*9,
+      a:Math.random()*Math.PI*2,va:(Math.random()-0.5)*0.32,
+      c:CCOL[(Math.random()*CCOL.length)|0]
+    });
+  }
+}
+
+function piirraKonfetit(){
+  RAF=null;
+  if(!CTX||!CVS){return;}
+  var W=CVS.width,H=CVS.height,jaljella=false;
+  CTX.clearRect(0,0,W,H);
+  var haipy=Math.max(0,Math.min(1,(CEND-Date.now())/900));
+  CTX.globalAlpha=haipy;
+  for(var i=0;i<PART.length;i++){
+    var p=PART[i];
+    p.vy+=0.22;p.vx*=0.994;p.vy*=0.994;
+    p.x+=p.vx;p.y+=p.vy;p.a+=p.va;
+    if(p.y<H+30)jaljella=true;
+    CTX.save();
+    CTX.translate(p.x,p.y);
+    CTX.rotate(p.a);
+    CTX.fillStyle=p.c;
+    /* kapeneva sivuttain -> vaikuttaa pyörivältä liuskalta */
+    CTX.fillRect(-p.w/2,-p.h/2,p.w*Math.abs(Math.cos(p.a*0.7)),p.h);
+    CTX.restore();
+  }
+  CTX.globalAlpha=1;
+  if(jaljella&&Date.now()<CEND)RAF=requestAnimationFrame(piirraKonfetit);
+  else lopetaKonfetit();
+}
+
+function lopetaKonfetit(){
+  clearTimeout(CT2);
+  if(RAF){cancelAnimationFrame(RAF);RAF=null;}
+  if(CTX&&CVS)CTX.clearRect(0,0,CVS.width,CVS.height);
+  if(CVS)CVS.hidden=true;
+  PART=[];
+}
+
+/* ---- napautusäänet ---- */
+function aani(rakenna){
+  if(MUTE)return;
+  var ac=audioOn();
+  if(!ac)return;
+  if(ac.state==="suspended"){try{ac.resume();}catch(e){}}
+  var main=ac.createGain();
+  main.connect(ac.destination);
+  rakenna(ac,main,ac.currentTime+0.01);
+}
+
+/* Oikein: kirkas kilahdus, kaksi ylä-ääntä nopealla vaimenemisella. */
+function soitaBling(){
+  aani(function(ac,main,t0){
+    main.gain.value=0.18;
+    [[1567.98,0,1],[2349.32,0.045,0.55],[3135.96,0.09,0.3]].forEach(function(n){
+      var o=ac.createOscillator(),g=ac.createGain();
+      o.type="sine";o.frequency.value=n[0];
+      var a=t0+n[1],d=0.42-n[1];
+      g.gain.setValueAtTime(0.0001,a);
+      g.gain.exponentialRampToValueAtTime(n[2],a+0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001,a+d);
+      o.connect(g);g.connect(main);
+      o.start(a);o.stop(a+d+0.02);
+    });
+  });
+}
+
+/* Väärin: matala töksähdys, taajuus putoaa saman tien. */
+function soitaTok(){
+  aani(function(ac,main,t0){
+    main.gain.value=0.26;
+    var o=ac.createOscillator(),g=ac.createGain(),lp=ac.createBiquadFilter();
+    o.type="triangle";
+    o.frequency.setValueAtTime(190,t0);
+    o.frequency.exponentialRampToValueAtTime(58,t0+0.16);
+    lp.type="lowpass";lp.frequency.value=900;
+    g.gain.setValueAtTime(0.0001,t0);
+    g.gain.exponentialRampToValueAtTime(1,t0+0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001,t0+0.2);
+    o.connect(lp);lp.connect(g);g.connect(main);
+    o.start(t0);o.stop(t0+0.24);
+    /* lyhyt kolahdus alkuun */
+    var len=Math.floor(ac.sampleRate*0.05);
+    var buf=ac.createBuffer(1,len,ac.sampleRate),ch=buf.getChannelData(0);
+    for(var i=0;i<len;i++)ch[i]=(Math.random()*2-1)*Math.pow(1-i/len,3);
+    var ns=ac.createBufferSource(),ng=ac.createGain(),lp2=ac.createBiquadFilter();
+    ns.buffer=buf;lp2.type="lowpass";lp2.frequency.value=1400;
+    ng.gain.value=0.5;
+    ns.connect(lp2);lp2.connect(ng);ng.connect(main);
+    ns.start(t0);
+  });
+}
+
+/* ---- häviäjän ääni: voo voo voo voOoOoOo ---- */
+var Bb3=233.08,A3=220.00,G3=196.00,F3=174.61,Bb2=116.54;
+
+function soitaVoo(){
+  if(MUTE)return;
+  var ac=audioOn();
+  if(!ac)return;
+  if(ac.state==="suspended"){try{ac.resume();}catch(e){}}
+  var t0=ac.currentTime+0.02;
+  var main=ac.createGain();
+  main.gain.value=0.20;
+  main.connect(ac.destination);
+
+  function voo(f,alkaa,kesto,liuku){
+    for(var k=0;k<2;k++){
+      var o=ac.createOscillator(),g=ac.createGain(),lp=ac.createBiquadFilter();
+      o.type=k?"sawtooth":"triangle";
+      o.frequency.setValueAtTime(f,alkaa);
+      /* Viimeinen "voOoOoOo" liukuu alas taajuusrampilla. */
+      if(liuku)o.frequency.exponentialRampToValueAtTime(liuku,alkaa+kesto*0.92);
+      o.detune.value=k?9:-9;
+      lp.type="lowpass";
+      lp.frequency.setValueAtTime(Math.min(2600,f*8),alkaa);
+      if(liuku)lp.frequency.exponentialRampToValueAtTime(Math.min(1400,liuku*7),alkaa+kesto*0.92);
+      var v=(k?0.35:0.65);
+      g.gain.setValueAtTime(0.0001,alkaa);
+      g.gain.exponentialRampToValueAtTime(v,alkaa+0.05);
+      g.gain.exponentialRampToValueAtTime(v*0.7,alkaa+kesto*0.6);
+      g.gain.exponentialRampToValueAtTime(0.0001,alkaa+kesto);
+      o.connect(lp);lp.connect(g);g.connect(main);
+      o.start(alkaa);o.stop(alkaa+kesto+0.03);
+    }
+  }
+  voo(Bb3,t0+0.00,0.20);
+  voo(A3, t0+0.26,0.20);
+  voo(G3, t0+0.52,0.20);
+  voo(F3, t0+0.80,1.15,Bb2);
+}
+
+/* ---- palkintokoroke ----
+   Sijoittuu tulossivulle pysyvästi, ja siinä on aina kolme paikkaa
+   riippumatta pelaajamäärästä. */
+function korokeData(){
+  return scoresList().filter(function(p){return p.inGame&&p.s>0;}).slice(0,3);
+}
+
+var MITALIT=["Kulta","Hopea","Pronssi"];
+function korokeHTML(){
+  var top=korokeData();
+  /* Klassinen järjestys: hopea, kulta, pronssi. Vaihe kerrotaan luokassa,
+     joten uudelleenpiirto ei toista nousua. */
+  var h='<div class="podium'+(S.korokeVaihe?" v"+S.korokeVaihe:"")+'" id="podium">'+
+        '<div class="pod">';
+  [1,0,2].forEach(function(idx){
+    var p=top[idx];
+    /* Tyhjä paikka jätetään näkymättömäksi mutta varaa yhä tilansa,
+       jotta kulta pysyy keskellä pelaajamäärästä riippumatta. */
+    if(!p){h+='<div class="p p'+(idx+1)+' tyhja"></div>';return;}
+    h+='<div class="p p'+(idx+1)+(p.id===S.me.id?" me":"")+'">'+
+       '<span class="nm">'+esc(p.n)+"</span>"+
+       '<span class="pts">'+p.s+"<u>p</u></span>"+
+       '<span class="blk"><b>'+(idx+1)+"</b><i>"+MITALIT[idx]+"</i></span></div>";
+  });
+  return h+'</div><div class="lattia"></div></div>';
+}
+
+function korokeVaihe(n){
+  S.korokeVaihe=n;
+  var el=document.getElementById("podium");
+  if(el)el.className="podium v"+n;
+}
+
+function naytaTulokset(){
+  S.tuloksetNakyy=true;
+  var el=document.getElementById("tulokset");
+  if(el)el.className="tulokset nakyy";
+}
+
+var WT1=null,WTS=[];
+function juhli(){
+  var top=korokeData();
+  if(!top.length)return;
+  /* Konfetit ja fanfaari vain voittajalle; muille laskeva voo. */
+  var kulta=(top[0]&&top[0].id===S.me.id);
+
+  var kevyt=false;
+  try{kevyt=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;}catch(e){}
+
+  /* Odotetaan pistekyltin katoamista JA viimeisen kortin paljastusta. */
+  var odota=Math.max(300,(S.toastEnd||0)-nowMs()+250,waitMs()+250);
+  clearTimeout(WT1);
+  WTS.forEach(function(t){clearTimeout(t);});WTS=[];
+  /* Aloitetaan alimmasta olemassa olevasta sijasta: yhden pelaajan matsissa
+     kulta nousisi muuten vasta 1,8 s myöhässä tyhjien odottelun takia. */
+  var alku=4-top.length;                              /* 3 pelaajaa->1, 2->2, 1->3 */
+  function kultaHetki(){
+    korokeVaihe(3);
+    /* Ääni ja konfetit vain voittajalle; muille ei mitään. */
+    if(kulta){soita();if(!kevyt)konfetit();}
+  }
+  WT1=setTimeout(function(){
+    if(alku>=3){kultaHetki();}
+    else{
+      korokeVaihe(alku);
+      for(var v=alku+1;v<=3;v++)(function(vv,d){
+        WTS.push(setTimeout(function(){
+          if(vv>=3)kultaHetki();else korokeVaihe(vv);
+        },d));
+      })(v,(v-alku)*900);
+    }
+    WTS.push(setTimeout(naytaTulokset,(3-alku)*900+1200));
+  },odota);
+}
+
+function lopetaJuhla(){
+  clearTimeout(WT1);
+  WTS.forEach(function(t){clearTimeout(t);});WTS=[];
+  S.korokeVaihe=0;S.tuloksetNakyy=false;
+  lopetaKonfetit();
+}
+
+/* ================= tila ================= */
+var S={tab:"peli",screen:"lobbies",msg:null,lad:false,q:7,m:null,sel:{a:0,b:1},mtx:[],
+  me:makeMe(), code:null, lobbies:[], lobErr:null,
+  setup:{qi:5,cards:20},                 /* qi = indeksi SIZES-taulukkoon */
+  solo:{on:false,q:7,cards:20,round:1,score:0,miss:0,t0:0,tEnd:0,a:0,b:0,seed:0},
+  blocked:null, dragging:false, needRender:false, copied:false, juhlittu:false, toastEnd:0,
+  lastMsg:0, lukossa:false, pendT:null, shownDeal:null, liveT:null, typeId:null, typeT:0, korokeVaihe:0, tuloksetNakyy:false, sigPohja:null, korostettu:false, ringSeed:null,
+  reveal:null, pendRev:null, pending:false, lock:0, sig:null,
+  dealSeen:0, atSeen:null, wasLive:true};
+
+var ROOM=null;
+var app=document.getElementById("app");
+var cache={};
+
+function modelFor(q){if(!cache[q])cache[q]=buildModel(q);return cache[q];}
+function fmt(n){return n.toLocaleString("fi-FI");}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){
+  return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+function nowMs(){return Date.now();}
+function setupQ(){return SIZES[S.setup.qi];}
+function locked(){return S.lock>nowMs();}
+function lockLeft(){return Math.max(0,S.lock-nowMs());}
+function penalise(){S.lock=nowMs()+PENALTY;}
+
+/* ================= kello =================
+   Kortin aktivoitumishetki sovitaan palvelimen aikana, joten laitteiden
+   kellot on suhteutettava siihen. Kirjoitetaan palvelinleima ja luetaan
+   vastaus: menomatkan puolikas antaa poikkeaman NTP:n tapaan. */
+var clockOff=0, clockRtt=1e9, clockOk=false;
+function serverNow(){return Date.now()+clockOff;}
+
+/* Yksi näyte ei riitä: jos se sattuu ruuhkaiseen hetkeen tai epäonnistuu,
+   pelaaja jää ilman kellosynkronointia ja hänen korttinsa herää oman
+   vastaanottohetkensä mukaan — eli eri aikaan kuin muilla. Otetaan sarja
+   näytteitä ja pidetään tarkin. */
+function kelloNayte(){
+  if(!netOn()||!S.code)return;
+  var t0=Date.now();
+  fetch(base()+"/players/"+S.me.id+"/ping.json",
+    {method:"PUT",headers:{"Content-Type":"application/json"},body:'{".sv":"timestamp"}'})
+    .then(function(r){return r.json();})
+    .then(function(v){
+      if(typeof v!=="number")return;
+      var rtt=Date.now()-t0;
+      if(rtt>4000)return;
+      /* pienimmän edestakaisen viiveen näyte on tarkin */
+      if(rtt<clockRtt||!clockOk){
+        clockRtt=Math.min(clockRtt,rtt);
+        clockOff=v-(t0+rtt/2);
+        clockOk=true;
+      }
+    }).catch(function(){});
+}
+
+function syncClock(n){
+  n=n||1;
+  for(var i=0;i<n;i++)setTimeout(kelloNayte,i*350);
+}
+
+/* Kello käy hitaasti eri tahtia laitteissa, joten vanha näyte ei saa jäädä
+   ikuisesti voittajaksi: annetaan tuoreiden näytteiden korvata se. */
+setInterval(function(){
+  if(!S.code)return;
+  clockRtt=Math.min(clockRtt*1.7+40,3000);
+  syncClock(3);
+},45000);
+
+/* Kunnes kello on synkassa, yritetään tiheämmin. */
+setInterval(function(){
+  if(S.code&&netOn()&&!clockOk)syncClock(2);
+},3000);
+
+/* ================= verkko ================= */
+var NET={url:null,es:null,hb:null,state:"off",rx:0};
+function netOn(){return !!NET.url;}
+function netInit(){
+  var u=window.DOBBLE_DB;
+  if(!u||typeof u!=="string"||u.indexOf("http")!==0){NET.state="off";return;}
+  NET.url=u.replace(/\/+$/,"");
+}
+function base(){return NET.url+"/rooms/"+S.code;}
+
+function put(path,body){
+  if(!netOn()||!S.code)return Promise.resolve();
+  return fetch(base()+path+".json?print=silent",
+    {method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
+    .catch(function(){});
+}
+function patch(path,body){
+  if(!netOn()||!S.code)return Promise.resolve();
+  return fetch(base()+path+".json?print=silent",
+    {method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
+    .catch(function(){});
+}
+
+/* Sijoittaa arvon polkuun. Polku voi tulla myös patch-viestin avaimesta,
+   jolloin siinä on kauttaviivoja ("scores/abc"). Ilman purkua avain
+   tallentuisi sellaisenaan juureen eivätkä pisteet päivittyisi lainkaan. */
+function setPath(path,value){
+  var parts=path.split("/").filter(function(x){return x.length;});
+  if(!parts.length){ROOM=(value&&typeof value==="object")?value:{};return;}
+  if(!ROOM)ROOM={};
+  var n=ROOM,i;
+  for(i=0;i<parts.length-1;i++){
+    if(n[parts[i]]==null||typeof n[parts[i]]!=="object")n[parts[i]]={};
+    n=n[parts[i]];
+  }
+  var last=parts[parts.length-1];
+  if(value===null)delete n[last];else n[last]=value;
+}
+
+function netEvent(e){
+  var msg;try{msg=JSON.parse(e.data);}catch(err){return;}
+  var path=msg.path||"/",data=msg.data;
+  var prevRound=ROOM&&ROOM.round,prevState=ROOM&&ROOM.state;
+  if(e.type==="patch"){
+    for(var k in data)setPath(path+"/"+k,data[k]);
+  }else{
+    setPath(path,data);
+  }
+  NET.state="live";NET.rx=Date.now();
+  onRoom(prevRound,prevState);
+}
+
+/* Liittyminen: j kirjoitetaan KERRAN. Syke päivittää vain nimen ja ajan,
+   muuten liittymisaika siirtyisi eteenpäin eikä isännyys tulisi koskaan. */
+/* Virtayhteys avataan uudelleen jos se katkeaa. Lisäksi huoneen tila
+   haetaan kertaluvulla, jos virta ei tuota mitään muutamassa sekunnissa —
+   ensimmäinen yhteydenotto epäonnistuu toisinaan. */
+var esRetry=null,esTries=0;
+
+function openStream(){
+  if(!netOn()||!S.code)return;
+  if(NET.es){try{NET.es.close();}catch(e){}NET.es=null;}
+  NET.state="connecting";paintDot();
+  /* Kertakäyttöinen osoite: mikään välimuisti ei voi tarjota vanhaa,
+     jo päättynyttä vastausta elävän virran sijaan. */
+  try{NET.es=new EventSource(base()+".json?s="+Date.now()+"_"+
+    Math.random().toString(36).slice(2,7));}
+  catch(e){NET.state="error";scheduleReopen();return;}
+  NET.es.onopen=function(){NET.state="live";NET.rx=Date.now();esTries=0;paintDot();};
+  NET.es.onerror=function(){
+    NET.state="error";paintDot();
+    if(!NET.es||NET.es.readyState===2)scheduleReopen();
+  };
+  NET.es.addEventListener("put",netEvent);
+  NET.es.addEventListener("patch",netEvent);
+  /* Firebase lähettää elomerkkejä; niistä tiedetään että yhteys on pystyssä. */
+  NET.es.addEventListener("keep-alive",function(){
+    NET.rx=Date.now();
+    if(NET.state!=="live"){NET.state="live";paintDot();}
+  });
+  /* Palvelin sulki virran: avataan uusi. */
+  NET.es.addEventListener("cancel",function(){NET.state="error";scheduleReopen();});
+  NET.es.addEventListener("auth_revoked",function(){NET.state="error";scheduleReopen();});
+}
+
+/* Virta voi hiljetä ilman virhettä. Jos mitään ei kuulu, avataan uudelleen. */
+setInterval(function(){
+  if(!netOn()||!S.code)return;
+  if(NET.rx&&Date.now()-NET.rx<25000)return;
+  if(esRetry)return;
+  openStream();
+  pullRoom();
+},5000);
+
+function scheduleReopen(){
+  if(esRetry||!S.code)return;
+  var d=Math.min(8000,700*Math.pow(1.7,esTries++));
+  esRetry=setTimeout(function(){esRetry=null;if(S.code)openStream();},d);
+}
+
+function pullRoom(){
+  if(!netOn()||!S.code)return;
+  fetch(base()+".json?_="+Date.now(),{cache:"no-store"}).then(function(r){return r.json();})
+    .then(function(d){
+      NET.state="live";NET.rx=Date.now();paintDot();
+      if(!d||ROOM)return;
+      ROOM=d;
+      onRoom(null,null);
+      if(S.tab==="peli"&&S.screen==="mp")render();
+    }).catch(function(){});
+}
+
+function joinRoom(code){
+  S.code=code;ROOM=null;S.sig=null;HS=null;lastArb=-1;finDone=false;
+  S.reveal=null;S.pendRev=null;S.lastDeal=null;S.pending=false;
+  if(!netOn())return;
+  esTries=0;
+  if(esRetry){clearTimeout(esRetry);esRetry=null;}
+  /* Sivun päivitys ei saa siirtää liittymisaikaa eteenpäin, muuten isännyys
+     katoaisi joka päivityksellä. Kirjoitetaan se vain jos sitä ei ole. */
+  fetch(base()+"/players/"+S.me.id+".json?_="+Date.now(),{cache:"no-store"})
+    .then(function(r){return r.json();})
+    .then(function(old){
+      if(S.code!==code)return;
+      if(old&&typeof old.j==="number")patch("/players/"+S.me.id,{n:S.me.name.slice(0,18),t:nowMs()});
+      else put("/players/"+S.me.id,{n:S.me.name.slice(0,18),t:nowMs(),j:{".sv":"timestamp"}});
+    })
+    .catch(function(){
+      put("/players/"+S.me.id,{n:S.me.name.slice(0,18),t:nowMs(),j:{".sv":"timestamp"}});
+    });
+  openStream();
+  if(!NET.hb)NET.hb=setInterval(beat,BEAT);
+  clockRtt=1e9;clockOk=false;
+  syncClock(5);
+  setTimeout(syncClock,400);setTimeout(syncClock,1200);
+  setTimeout(pullRoom,2200);
+  setTimeout(pullRoom,5000);
+  try{location.hash=code;}catch(e){}
+}
+
+
+
+function leaveRoom(){
+  if(esRetry){clearTimeout(esRetry);esRetry=null;}
+  if(NET.es){try{NET.es.close();}catch(e){}NET.es=null;}
+  if(NET.hb){clearInterval(NET.hb);NET.hb=null;}
+  if(netOn()&&S.code)fetch(base()+"/players/"+S.me.id+".json",{method:"DELETE"}).catch(function(){});
+  ROOM=null;S.code=null;S.sig=null;
+  try{if(location.hash)location.hash="";}catch(e){}
+}
+
+function beat(){
+  if(!netOn()||!S.code)return;
+  var mine=ROOM&&ROOM.players&&ROOM.players[S.me.id];
+  if(ROOM&&(!mine||typeof mine.j!=="number")){
+    /* Rivi puuttuu tai liittymisaika hukkui — liitytään uudelleen kokonaan.
+       Pelkkä PATCH loisi rivin ilman j:tä, jolloin jäisi näkymättömiin. */
+    put("/players/"+S.me.id,{n:S.me.name.slice(0,18),t:nowMs(),j:{".sv":"timestamp"}});
+    return;
+  }
+  patch("/players/"+S.me.id,{n:S.me.name.slice(0,18),t:nowMs()});
+}
+
+/* ================= versioportti =================
+   Uusin käytössä oleva versio kirjataan kantaan. Sitä vanhemmalla ei voi
+   pelata, koska eri versiot eivät toimi yhdessä. Raja nousee itsestään
+   heti kun joku avaa uuden version — erillistä ylläpitoa ei tarvita. */
+function applyMin(min){
+  if(min>PROTO){
+    if(!S.blocked||S.blocked.min!==min){
+      S.blocked={min:min};
+      if(S.code)leaveRoom();
+      render();
+    }
+    return;
+  }
+  if(S.blocked){S.blocked=null;render();}
+  /* Raja nostetaan vain omaan versioon, ei koskaan korkeammalle. */
+  if(min<PROTO)
+    fetch(NET.url+"/meta/min.json?print=silent",
+      {method:"PUT",headers:{"Content-Type":"application/json"},body:String(PROTO)})
+      .catch(function(){});
+}
+
+function checkVersion(){
+  if(!netOn())return;
+  fetch(NET.url+"/meta/min.json?_="+Date.now(),{cache:"no-store"})
+    .then(function(r){return r.json();})
+    .then(function(v){applyMin((typeof v==="number"&&isFinite(v))?v:0);})
+    .catch(function(){});
+}
+
+/* Versiorajaa kuunnellaan jatkuvasti, joten ilmoitus tulee heti kun joku
+   avaa uudemman version — ei vasta seuraavalla tarkistuskierroksella. */
+var metaES=null,metaRetry=null;
+function watchVersion(){
+  if(!netOn()||metaES)return;
+  try{
+    metaES=new EventSource(NET.url+"/meta/min.json?s="+Date.now()+"_"+
+      Math.random().toString(36).slice(2,7));
+  }catch(e){return;}
+  function ev(e){
+    var msg;try{msg=JSON.parse(e.data);}catch(err){return;}
+    var v=msg.data;
+    if(msg.path&&msg.path!=="/")return;
+    applyMin((typeof v==="number"&&isFinite(v))?v:0);
+  }
+  metaES.addEventListener("put",ev);
+  metaES.addEventListener("patch",ev);
+  metaES.onerror=function(){
+    if(metaES&&metaES.readyState!==2)return;
+    try{metaES.close();}catch(e2){}
+    metaES=null;
+    if(metaRetry)return;
+    metaRetry=setTimeout(function(){metaRetry=null;watchVersion();},4000);
+  };
+}
+setInterval(function(){checkVersion();watchVersion();},30000);
+
+/* Aula kantaa isäntänsä version; eri versiolla tehtyyn ei voi liittyä. */
+function roomVer(){return (ROOM&&typeof ROOM.v==="number")?ROOM.v:null;}
+function roomOk(){var v=roomVer();return v===null||v===PROTO;}
+
+/* ================= aulalista ================= */
+function newCode(){
+  var s="",i;
+  for(i=0;i<4;i++)s+=CODE_ABC[Math.floor(Math.random()*CODE_ABC.length)];
+  return s;
+}
+
+var lobTries=0;
+function loadLobbies(){
+  if(!netOn())return;
+  /* Aikaleima estää selainta tarjoamasta vanhaa vastausta välimuistista. */
+  fetch(NET.url+"/rooms.json?_="+Date.now(),{cache:"no-store"})
+    .then(function(r){return r.json();}).then(function(all){
+    var out=[],t=nowMs(),code,stale=[];
+    for(code in (all||{})){
+      var rm=all[code]||{},pl=rm.players||{},live=0,newest=0,id;
+      for(id in pl){
+        var p=pl[id];
+        if(!p||!p.t)continue;
+        if(p.t>newest)newest=p.t;
+        if(t-p.t<=STALE)live++;
+      }
+      if(live>0)out.push({code:code,n:live,state:rm.state||"lobby",
+        q:rm.q||7,cards:rm.cards||20,
+        v:(typeof rm.v==="number")?rm.v:null});
+      else if(t-newest>LOBBY_TTL)stale.push(code);
+    }
+    out.sort(function(a,b){return b.n-a.n||(a.code<b.code?-1:1);});
+    var sig=out.map(function(L){return L.code+L.n+L.state+L.q+L.v;}).join(",");
+    var changed=(sig!==S.lobSig)||S.lobErr;
+    S.lobSig=sig;S.lobbies=out;S.lobErr=null;lobTries=0;
+    NET.state="live";NET.rx=Date.now();paintDot();
+    stale.slice(0,5).forEach(function(c){          /* siivotaan hylätyt */
+      fetch(NET.url+"/rooms/"+c+".json",{method:"DELETE"}).catch(function(){});
+    });
+    if(S.screen==="lobbies"&&changed)render();
+  }).catch(function(){
+    S.lobSig=null;
+    lobTries++;
+    if(lobTries<3){                       /* ohimenevä katko: yritetään heti uudelleen */
+      setTimeout(function(){if(S.screen==="lobbies")loadLobbies();},700);
+      return;
+    }
+    NET.state="error";paintDot();
+    S.lobErr="Aulalistaa ei saatu haettua. Yritetään uudelleen…";
+    if(S.screen==="lobbies")render();
+  });
+}
+
+/* ================= huoneen tulkinta ================= */
+function activePlayers(){
+  var out=[],k,p,t=nowMs();
+  if(!ROOM||!ROOM.players)return out;
+  for(k in ROOM.players){
+    p=ROOM.players[k];
+    if(!p||typeof p!=="object")continue;
+    if(typeof p.j!=="number")continue;
+    if(p.t&&t-p.t>STALE)continue;
+    out.push({id:k,n:p.n||"?",j:p.j});
+  }
+  out.sort(function(a,b){return a.j-b.j||(a.id<b.id?-1:1);});
+  return out;
+}
+function hostId(){var a=activePlayers();return a.length?a[0].id:null;}
+function iAmHost(){return hostId()===S.me.id;}
+function roomState(){return (ROOM&&ROOM.state)||"lobby";}
+
+/* Kuinka kauan kortin heräämiseen. Jos kello ei ole synkassa, käytetään
+   paikallista varamittaa vastaanottohetkestä, jottei odotus veny väärin. */
+function waitMs(){
+  if(!ROOM||typeof ROOM.at!=="number")return 0;
+  var d;
+  if(clockOk){
+    d=ROOM.at-serverNow();
+    if(d>LEAD+800)d=LEAD+800;
+  }else{
+    d=(S.dealSeen||0)+REVEAL-Date.now();
+  }
+  return d>0?d:0;
+}
+function cardLive(){return waitMs()<=0;}
+
+function scoresList(){
+  var act=activePlayers(),sc=(ROOM&&ROOM.scores)||{},out=[],i;
+  for(i=0;i<act.length;i++)
+    out.push({id:act[i].id,n:act[i].n,s:sc[act[i].id]||0,host:i===0,
+      inGame:!!(ROOM&&ROOM.roster&&ROOM.roster[act[i].id])});
+  out.sort(function(a,b){return b.s-a.s||a.n.localeCompare(b.n,"fi");});
+  return out;
+}
+
+/* o = matsin kuvasiirtymä. Se kulkee jaon mukana eikä erillisenä kenttänä:
+   jos pelaaja saa kortit, hän saa väistämättä myös oikean kuvaston.
+   Erillisenä kenttänä se saattoi puuttua hetken, jolloin osa pelaajista
+   piirsi kortit eri kuvilla. */
+function dealFor(q,off){
+  var m=modelFor(q),n=m.ncard;
+  var a=Math.floor(Math.random()*n),b=Math.floor(Math.random()*(n-1));
+  if(b>=a)b++;
+  if(Math.random()<0.5){var t=a;a=b;b=t;}
+  return {a:a,b:b,s:(Math.random()*1e9)|0,o:off||0};
+}
+function rosterNow(){
+  var act=activePlayers(),r={},i;
+  for(i=0;i<act.length;i++)r[act[i].id]=1;
+  return r;
+}
+
+/* ================= isännän tehtävät ================= */
+function hostStart(){
+  if(S.blocked||!roomOk())return;
+  var q=setupQ();
+  HS={};lastArb=-1;finDone=false;
+  var ss=(Math.random()*1e9)|0;
+  patch("",{v:PROTO,q:q,cards:S.setup.cards,ss:ss,
+    state:"play",round:1,deal:dealFor(q,ss),
+    at:serverNow()+LEAD,
+    roster:rosterNow(),scores:null,claims:null,last:null,winner:null,fin:null});
+}
+function hostReset(){
+  HS={};lastArb=-1;finDone=false;
+  patch("",{state:"lobby",round:0,deal:null,scores:null,claims:null,last:null,
+    roster:null,winner:null,fin:null,at:null});
+}
+function hostStop(){
+  if(!iAmHost()||roomState()!=="play")return;
+  /* Jos kukaan ei ehtinyt saada pistettä, tulossivulla ei ole mitään
+     näytettävää — palataan suoraan aulaan. */
+  var sc=(ROOM&&ROOM.scores)||{},pisteita=false,k;
+  for(k in sc)if(sc[k]>0)pisteita=true;
+  if(!pisteita){hostReset();return;}
+  patch("",{state:"done",claims:null,last:null});
+}
+
+function winnerOf(scores,roster){
+  var best=null,bestS=-1,tie=false,id;
+  for(id in (roster||{})){
+    var s=(scores&&scores[id])||0;
+    if(s>bestS){bestS=s;best=id;tie=false;}
+    else if(s===bestS&&best!==null)tie=true;
+  }
+  if(tie||best===null||bestS<=0)return null;
+  var p=ROOM&&ROOM.players&&ROOM.players[best];
+  return {id:best,n:(p&&p.n)||"?",s:bestS};
+}
+
+/* Isäntä on ainoa joka kirjoittaa pisteet, joten se pitää niistä omaa
+   laskuria. Näin kirjaus ei riipu siitä ehtiikö kaiku takaisin, eikä
+   REST-rajapinnan palvelinarvoista. */
+var HS=null;
+function hostScores(){
+  if(!HS){
+    HS={};
+    var k;
+    for(k in ((ROOM&&ROOM.scores)||{}))
+      if(typeof ROOM.scores[k]==="number")HS[k]=ROOM.scores[k];
+  }
+  return HS;
+}
+
+/* Ratkaistut kierrokset muistetaan paikallisesti. Pelkkä ROOM.round ei riitä,
+   koska kirjoituksen kaiku saapuu vasta viiveellä — siihen asti kopio näyttäisi
+   yhä vanhaa kierrosta ja sama piste kirjautuisi uudestaan. */
+var settleT=null,lastArb=-1;
+function hostArbitrate(){
+  if(!iAmHost()||roomState()!=="play"||!ROOM)return;
+  var r=ROOM.round||1,cl=ROOM.claims&&ROOM.claims[r];
+  if(!cl||settleT||r<=lastArb)return;
+  var any=false,k0;
+  for(k0 in cl)if(typeof cl[k0].t==="number")any=true;
+  if(!any)return;
+  settleT=setTimeout(function(){
+    settleT=null;
+    if(!iAmHost()||roomState()!=="play"||!ROOM||(ROOM.round||1)!==r||r<=lastArb)return;
+    var c=ROOM.claims&&ROOM.claims[r];
+    if(!c)return;
+    var best=null,k;
+    for(k in c){
+      if(typeof c[k].t!=="number")continue;
+      if(!best||c[k].t<c[best].t||(c[k].t===c[best].t&&k<best))best=k;
+    }
+    if(!best)return;
+    lastArb=r;
+    var hs=hostScores();
+    hs[best]=(hs[best]||0)+1;
+    var upd={last:{id:best,n:c[best].n,sym:c[best].y,r:r},claims:null,scores:hs};
+    if(r>=(ROOM.cards||20)){
+      /* Viimeisellekin kierrokselle heräämishetki, jotta paljastus ehtii
+         näkyä ennen tulossivua. */
+      upd.state="done";upd.round=r;upd.at=serverNow()+REVEAL;
+    }
+    else{
+      /* Sama siirtymä koko matsin ajan; luetaan edellisestä jaosta, jotta
+         se säilyy vaikka ylätason kenttä puuttuisi. */
+      upd.round=r+1;
+      upd.deal=dealFor(ROOM.q||7,
+        (ROOM.deal&&ROOM.deal.o)||ROOM.ss||0);
+      /* Sama hetki kaikille: kortti herää vasta tässä palvelinajassa. */
+      upd.at=serverNow()+REVEAL;
+    }
+    patch("",upd);
+  },SETTLE);
+}
+
+var finT=null,finDone=false;
+function hostFinalize(){
+  if(!iAmHost()||roomState()!=="done"||!ROOM||ROOM.fin||finDone||finT)return;
+  finT=setTimeout(function(){
+    finT=null;
+    if(!iAmHost()||roomState()!=="done"||!ROOM||ROOM.fin||finDone)return;
+    finDone=true;
+    patch("",{fin:1,winner:winnerOf(ROOM.scores,ROOM.roster)||null});
+  },FINALIZE);
+}
+
+/* Jos matsi jää roikkumaan ilman yhtään pelaajaa, uusi isäntä avaa aulan.
+   Ilman tätä kadonnut isäntä lukitsisi aulan pysyvästi. */
+/* Isäntä julkaisee asetuksensa myös vuoron siirtyessä tai aulaan tullessa. */
+function hostPublish(){
+  if(!iAmHost()||roomState()!=="lobby"||!ROOM)return;
+  if(ROOM.q===setupQ()&&ROOM.cards===S.setup.cards)return;
+  patch("",{q:setupQ(),cards:S.setup.cards});
+}
+
+function hostRescue(){
+  if(!iAmHost()||!ROOM||roomState()!=="play")return;
+  var ros=ROOM.roster||{},act=activePlayers(),i,live=0;
+  for(i=0;i<act.length;i++)if(ros[act[i].id])live++;
+  if(live===0)hostReset();
+}
+
+function onRoom(prevRound,prevState){
+  /* Uusi matsi alkaa: edellisen jäänteet pois, muuten vanha kortti jäisi
+     hetkeksi näkyviin eikä "Valmiina"-laskuria näytettäisi lainkaan. */
+  var st0=roomState();
+  if((st0==="play"&&prevState!=="play")||
+     (st0==="play"&&(ROOM&&ROOM.round)===1&&prevRound>1)){
+    S.reveal=null;S.pendRev=null;S.lastDeal=null;S.pending=false;
+    S.atSeen=null;S.wasLive=false;hideToast();
+  }
+  if(st0==="lobby"&&prevState!=="lobby"){
+    S.reveal=null;S.pendRev=null;S.lastDeal=null;S.pending=false;hideToast();
+  }
+  /* Viimeisellä kierroksella kierrosnumero ei muutu, joten paljastus on
+     tunnistettava tilan vaihtumisesta. Muuten kortit katoaisivat heti. */
+  var loppuKierros=(roomState()==="done"&&prevState!=="done"&&ROOM&&ROOM.last&&
+                    ROOM.last.r===(ROOM.round||0));
+  if(ROOM&&ROOM.last&&S.screen==="mp"&&S.lastDeal&&
+     ((prevRound!=null&&ROOM.round!==prevRound)||loppuKierros)){
+    var L=ROOM.last;
+    /* Sama siemen kuin jaossa, muuten kuvat hyppäisivät uusiin paikkoihin. */
+    S.reveal={a:S.lastDeal?S.lastDeal.a:null,b:S.lastDeal?S.lastDeal.b:null,
+      s:S.lastDeal?S.lastDeal.s:0,o:S.lastDeal?S.lastDeal.o:0,sym:L.sym,
+      /* Kierrosnumero palvelimelta, ei omasta muistista: jos virtaviesti on
+         jäänyt väliin, oma numero olisi vanhentunut ja piirto animoisi
+         kehän uudestaan. */
+      r:(L.r!=null?L.r:prevRound)};
+    S.dealSeen=Date.now();
+    S.pendRev=null;
+    clearTimeout(S.pendT);            /* vastaus tuli, varmistusta ei tarvita */
+    /* Uusi kortti: vanha väärä painallus ei enää koske sitä. */
+    S.lock=0;piilotaSakko();
+    /* Kyltti häipyy juuri ennen kuin uusi kortti herää. */
+    showToast(L.n,L.id===S.me.id,Math.max(350,waitMs()-360));
+    S.pending=false;
+    /* Kortit ovat jo ruudulla: korostetaan ne paikallaan. */
+    /* Kehää EI luoda tässä: kortit piirretään heti perään, jolloin juuri
+       animoitu kehä tuhoutuisi ja tilalle tulisi staattinen. Piirto hoitaa
+       sekä kehän että sen animaation kerran. */
+    S.korostettu=true;
+    /* Tikitys huomaisi kortin sammumisen ja piirtäisi sivun uusiksi juuri
+       kun rengas animoituu — jolloin se syntyisi toisen kerran. Kirjataan
+       tila valmiiksi, niin muutosta ei havaita. */
+    S.wasLive=cardLive();
+
+  }
+  /* Kyltti vain jos viimeinen piste kuuluu juuri päättyneeseen kierrokseen.
+     Kesken lopetetussa matsissa ei kukaan pisteitä saanut. */
+  if(roomState()==="done"&&prevState!=="done"&&ROOM&&ROOM.last&&
+     ROOM.last.r===(ROOM.round||0)){
+    showToast(ROOM.last.n,ROOM.last.id===S.me.id,1400);
+  }
+  if(roomState()==="done"&&prevState!=="done")S.pending=false;
+  /* Juhlinta vasta kun voittaja on varmistunut (fin), ja kerran matsia kohti. */
+  if(roomState()==="done"&&ROOM&&ROOM.fin&&!S.juhlittu){
+    S.juhlittu=true;
+    juhli();
+  }
+  if(roomState()!=="done"&&S.juhlittu){S.juhlittu=false;lopetaJuhla();}
+  if(roomState()!=="done"&&(S.korokeVaihe||S.tuloksetNakyy)){
+    S.korokeVaihe=0;S.tuloksetNakyy=false;
+  }
+  /* Myös kuvasiirtymä talteen: ilman sitä paljastus piirtäisi samat kortit
+     eri kuvastolla, jolloin kaikki kuvat näyttäisivät vaihtuvan. */
+  if(ROOM&&ROOM.deal)S.lastDeal={a:ROOM.deal.a,b:ROOM.deal.b,s:ROOM.deal.s,
+    o:ROOM.deal.o||0};
+  if(ROOM&&typeof ROOM.at==="number"&&ROOM.at!==S.atSeen){
+    S.atSeen=ROOM.at;S.dealSeen=Date.now();
+    /* Piirto täsmälleen heräämishetkellä. Aiemmin tämä ajastettiin vain
+       paljastuksesta, joten matsin ensimmäinen kortti jäi tikityksen
+       varaan — se herää eri hetkellä eri laitteissa. */
+    if(S.tab==="peli"&&S.screen==="mp"){
+      clearTimeout(S.liveT);
+      S.liveT=setTimeout(function(){
+        if(S.tab==="peli"&&S.screen==="mp")render();
+      },Math.max(0,waitMs()));
+    }
+  }
+  hostArbitrate();hostFinalize();hostRescue();hostPublish();
+  if(S.tab!=="peli"||S.screen!=="mp")return;
+  siivoaChat();
+  var pohja=roomSigBase(),sig=roomSig();
+  /* Kortit on juuri korostettu paikallaan; koko sivun piirto tuhoaisi
+     ne ja katkaisisi renkaan animaation. */
+  var kevyt=(sig!==S.sig&&pohja===S.sigPohja&&S.korostettu&&
+             S.tab==="peli"&&S.screen==="mp");
+  S.sigPohja=pohja;S.korostettu=false;
+  if(sig!==S.sig){
+    S.sig=sig;
+    if(kevyt){paivitaHUD();paintBoard();paintCards();}
+    else render();
+  }else{paintBoard();paintChat();paintDot();}
+}
+
+/* Perustunniste ilman kierrosnumeroa: jos vain kierros vaihtuu, riittää
+   kevyt päivitys eikä koko sivua tarvitse piirtää uusiksi. */
+function roomSigBase(){
+  if(!ROOM)return "-";
+  return roomState()+"|"+(ROOM.fin?1:0)+"|"+(iAmHost()?1:0)+
+    "|"+(ROOM.roster&&ROOM.roster[S.me.id]?1:0)+"|"+activePlayers().length+
+    "|"+(ROOM.q||0)+"|"+(ROOM.cards||0);
+}
+
+function paivitaHUD(){
+  var r=document.getElementById("hudr"),p=document.getElementById("hudp");
+  if(r&&ROOM)r.textContent=(ROOM.round||0)+" / "+(ROOM.cards||0);
+  if(p&&ROOM)p.textContent=(ROOM.scores&&ROOM.scores[S.me.id])||0;
+}
+
+function roomSig(){
+  if(!ROOM)return "-";
+  return roomState()+"|"+(ROOM.round||0)+"|"+(ROOM.fin?1:0)+"|"+(iAmHost()?1:0)+
+    "|"+(ROOM.roster&&ROOM.roster[S.me.id]?1:0)+"|"+activePlayers().length+
+    "|"+(ROOM.q||0)+"|"+(ROOM.cards||0);
+}
+
+function paintBoard(){
+  var el=document.getElementById("board");
+  if(!el||!el.parentNode)return;
+  var st=roomState();
+  var tmp=document.createElement("div");
+  tmp.innerHTML=boardHTML(st==="lobby"?"Aulassa":st==="play"?"Tilanne":"Lopputulokset");
+  el.parentNode.replaceChild(tmp.firstChild,el);
+}
+function paintDot(){
+  var d=document.getElementById("dot");
+  if(!d)return;
+  var s=NET.state;
+  d.className="dot"+(s==="live"?" live":s==="error"?" err":s==="connecting"?" busy":"");
+  d.title=s==="live"?"Yhteys toimii":s==="error"?"Ei yhteyttä — napauta yrittääksesi uudelleen":
+    s==="connecting"?"Yhdistetään…":"Ei verkkoyhteyttä";
+}
+
+/* Käsin käynnistettävä uudelleenyhdistys, jos automatiikka ei riitä. */
+/* Poistaa palvelutyöntekijän ja välimuistit ja lataa sovelluksen puhtaana.
+   Tällä pääsee eroon vanhasta välimuistiin jääneestä versiosta ilman että
+   käyttäjän tarvitsee tyhjentää selaimen tietoja käsin. */
+function hardReset(){
+  var jobs=[];
+  try{
+    if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations)
+      jobs.push(navigator.serviceWorker.getRegistrations().then(function(rs){
+        return Promise.all(rs.map(function(r){return r.unregister();}));
+      }));
+  }catch(e){}
+  try{
+    if(window.caches&&caches.keys)
+      jobs.push(caches.keys().then(function(ks){
+        return Promise.all(ks.map(function(k){return caches.delete(k);}));
+      }));
+  }catch(e){}
+  Promise.all(jobs).catch(function(){}).then(function(){
+    try{location.reload();}catch(e){}
+  });
+}
+
+function reconnect(){
+  if(!netOn())return;
+  esTries=0;
+  if(esRetry){clearTimeout(esRetry);esRetry=null;}
+  NET.state="connecting";paintDot();
+  if(S.code){openStream();pullRoom();syncClock(5);beat();}
+  else loadLobbies();
+}
+
+/* ================= yksinpeli ================= */
+function soloStart(){
+  if(S.blocked)return;
+  /* Kuvavalikoima arvotaan joka matsille: pienessä pakassa samat kuvat
+     toistuisivat muuten pelistä toiseen. */
+  S.solo={on:true,q:setupQ(),cards:S.setup.cards,round:1,score:0,miss:0,
+    ss:(Math.random()*1e9)|0,t0:nowMs(),tEnd:0};
+  S.lock=0;soloDeal();S.screen="solo";render();
+}
+function soloDeal(){
+  S.lock=0;piilotaSakko();
+  var d=dealFor(S.solo.q,S.solo.ss||0);
+  S.solo.a=d.a;S.solo.b=d.b;S.solo.seed=d.s;S.solo.off=d.o||0;
+}
+
+/* ================= näkymät ================= */
+function tabsHTML(){
+  var h='<div class="tabs">';
+  [["peli","Peli"],["pakka","Pakka"],["rakenne","Rakenne"]].forEach(function(t){
+    h+='<button class="tab'+(S.tab===t[0]?" on":"")+'" data-tab="'+t[0]+'">'+t[1]+"</button>";
+  });
+  return h+"</div>";
+}
+
+function hintHTML(extra){
+  /* Sakko näkyy omassa kelluvassa ikkunassaan, ei tekstirivillä. */
+  return '<p class="hint">'+(extra||"Napauta kuvaa, joka on molemmilla korteilla.")+"</p>";
+}
+
+/* ---- sakkoikkuna ---- */
+var PEL=null;
+function penNode(){
+  if(PEL)return PEL;
+  try{
+    PEL=document.createElement("div");
+    PEL.id="penalty";
+    PEL.hidden=true;
+    document.body.appendChild(PEL);
+  }catch(e){PEL=null;}
+  return PEL;
+}
+
+function naytaSakko(){
+  var el=penNode();
+  if(!el)return;
+  el.innerHTML='<span class="pl">Väärin</span><b id="pen">'+
+    (lockLeft()/1000).toFixed(1)+"</b><span class=\"ps\">sekuntia</span>";
+  if(el.hidden){
+    el.hidden=false;
+    try{el.style.animation="none";el.offsetHeight;el.style.animation="";}catch(e){}
+  }
+}
+
+function piilotaSakko(){
+  if(PEL)PEL.hidden=true;
+}
+
+/* Liu'ut. Kuvamäärä kulkee kelvollisten arvojen yli indeksinä,
+   koska välissä on kokoja joita ei ole olemassa. */
+/* Aulassa isännän valinnat kirjoitetaan huoneeseen, jotta muutkin näkevät
+   ne. Muille säätimet ovat lukittuja ja lukemat tulevat huoneesta. */
+function shownSetup(dis){
+  if(dis&&ROOM&&typeof ROOM.q==="number"){
+    var i=SIZES.indexOf(ROOM.q);
+    return {qi:i<0?S.setup.qi:i,q:ROOM.q,cards:ROOM.cards||S.setup.cards};
+  }
+  return {qi:S.setup.qi,q:setupQ(),cards:S.setup.cards};
+}
+
+function pushSetup(){
+  if(S.screen!=="mp"||!iAmHost()||roomState()!=="lobby")return;
+  patch("",{q:setupQ(),cards:S.setup.cards});
+}
+
+function subTeksti(q,cards){
+  var nc=q*q+q+1;
+  return "Pakassa on "+fmt(nc)+" korttia ja "+fmt(nc)+
+    " kuvaa; matsiin arvotaan niistä "+cards+".";
+}
+
+/* Isännälle säätimet, muille havainnekuva valituista asetuksista.
+   Kortit piirretään pelin omalla funktiolla, joten niissä on oikea määrä
+   oikeita kuvia oikeassa asettelussa — ei erillistä koristetta. */
+var MINI=92;
+
+function cardsHTML(m){
+  return '<div class="mini rear">'+cardHTML(m,1,MINI,{seed:37})+"</div>"+
+         '<div class="mini fore">'+cardHTML(m,0,MINI,{seed:11})+"</div>";
+}
+
+/* Liittymisosoite. Aulan koodi on jo osoitteen lopussa, joten linkin
+   avaaminen vie suoraan oikeaan aulaan — QR-koodi vain kantaa sen. */
+function joinURL(){
+  try{
+    return location.origin+location.pathname+location.search+"#"+S.code;
+  }catch(e){return "#"+(S.code||"");}
+}
+
+/* Nimikenttä: otsikko, kynäkuvake ja oma taustasävy, jotta sen näkee
+   olevan muokattava eikä pelkkä tietolaatikko. */
+function nickHTML(){
+  return '<div class="who"><span class="dot" id="dot"></span>'+
+    '<label class="nickbox"><span class="nicklab">Nimesi</span>'+
+    '<input id="nick" maxlength="18" value="'+esc(S.me.name)+
+    '" aria-label="Nimimerkki" autocomplete="off" spellcheck="false">'+
+    '<span class="pen"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" '+
+    'stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">'+
+    '<path d="M4 20h4.5L20.5 8 16 3.5 4 15.5V20z"/><path d="M14.5 5.5L18.5 9.5"/>'+
+    "</svg></span></label>"+
+    '<button id="mute" class="mute'+(MUTE?" off":"")+'" aria-label="Äänet" title="'+
+    (MUTE?"Äänet pois":"Äänet päällä")+'">'+
+    '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" '+
+    'stroke-width="2" stroke-linejoin="round" stroke-linecap="round">'+
+    '<path d="M4 9v6h4l5 4V5L8 9H4z"/>'+
+    (MUTE?'<path d="M17 9.5l4 5M21 9.5l-4 5"/>':'<path d="M16.5 8.5a5 5 0 010 7"/>')+
+    "</svg></button></div>";
+}
+
+/* ================= viestit =================
+   Aulan keskustelu. Avaimet luodaan POSTilla, jolloin ne järjestyvät
+   aikajärjestykseen itsestään. */
+var CHAT_MAX=30, CHAT_KEEP=40;
+
+function chatViestit(){
+  var out=[];
+  if(!ROOM||!ROOM.chat)return out;
+  Object.keys(ROOM.chat).sort().forEach(function(k){
+    var c=ROOM.chat[k];
+    if(c&&typeof c.m==="string"&&c.m)out.push(c);
+  });
+  return out.slice(-CHAT_MAX);
+}
+
+/* Väri johdetaan pelaajan tunnisteesta, joten sama nimi näkyy samana
+   värinä kaikilla laitteilla. */
+function nimiVari(id){
+  var s=String(id||""),hh=5381,i;
+  for(i=0;i<s.length;i++)hh=((hh*33)^s.charCodeAt(i))>>>0;
+  return "hsl("+(hh%360)+",72%,"+(64+(hh>>>9)%12)+"%)";
+}
+
+function chatLogHTML(){
+  var v=chatViestit();
+  if(!v.length)return '<p class="cempty">Ei vielä viestejä.</p>';
+  return v.map(function(c){
+    return '<div class="cm'+(c.i===S.me.id?" me":"")+'">'+
+      '<b style="color:'+nimiVari(c.i)+'">'+esc(c.n||"?")+"</b>"+
+      "<span>"+esc(c.m)+"</span></div>";
+  }).join("");
+}
+
+function chatHTML(){
+  return '<div class="chat"><h3>Viestit</h3>'+
+    '<div class="clog" id="chatlog">'+chatLogHTML()+"</div>"+
+    '<div class="crow">'+
+    '<input id="msg" maxlength="80" placeholder="Kirjoita viesti…" '+
+    'autocomplete="off" aria-label="Viesti">'+
+    '<button class="csend" id="send" aria-label="Lähetä">'+
+    '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" '+
+    'stroke-width="2" stroke-linejoin="round" stroke-linecap="round">'+
+    '<path d="M4 12l16-8-6 16-2.5-6.5L4 12z"/></svg></button></div></div>';
+}
+
+/* Kohdennettu päivitys: koko sivun piirto katkaisisi kirjoittamisen. */
+function paintChat(){
+  var el=document.getElementById("chatlog");
+  if(!el||!el.parentNode)return;
+  el.innerHTML=chatLogHTML();
+  try{el.scrollTop=el.scrollHeight;}catch(e){}
+}
+
+function lahetaViesti(){
+  var el=document.getElementById("msg");
+  if(!el)return;
+  var v=String(el.value||"").trim().slice(0,80);
+  if(!v||!netOn()||!S.code)return;
+  if(nowMs()-(S.lastMsg||0)<600)return;      /* estää vahinkotoiston */
+  S.lastMsg=nowMs();
+  el.value="";
+  fetch(base()+"/chat.json",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({i:S.me.id,n:S.me.name.slice(0,18),m:v,t:{".sv":"timestamp"}})})
+    .catch(function(){});
+}
+
+/* Isäntä karsii vanhat, jottei kanta kasva rajatta. */
+function siivoaChat(){
+  if(!iAmHost()||!ROOM||!ROOM.chat||!netOn()||!S.code)return;
+  var keys=Object.keys(ROOM.chat).sort();
+  if(keys.length<=CHAT_KEEP)return;
+  keys.slice(0,keys.length-CHAT_MAX).forEach(function(k){
+    fetch(base()+"/chat/"+k+".json",{method:"DELETE"}).catch(function(){});
+  });
+}
+
+function qrHTML(){
+  if(!S.code)return "";
+  var u=joinURL();
+  return '<div class="qrbox"><div class="qrimg">'+qrSVG(u,116)+"</div>"+
+    '<div class="qrtxt"><b>'+S.code+"</b>"+
+    "<span>Skannaa puhelimella tai jaa linkki</span>"+
+    '<button class="btn ghost" id="copylink">'+
+    (S.copied?"Kopioitu":"Kopioi linkki")+"</button></div></div>";
+}
+
+function previewHTML(dis){
+  var C=shownSetup(dis),q=C.q,cards=C.cards,m=modelFor(q);
+  return '<div class="prev">'+
+    '<div class="pvcards" id="pvcards">'+cardsHTML(m)+"</div>"+
+    '<div class="pvnums">'+
+      '<div class="pvn"><b id="pvn1">'+(q+1)+"</b><span>kuvaa kortilla</span></div>"+
+      '<div class="pvn"><b id="pvn2">'+cards+"</b><span>korttiparia matsissa</span></div>"+
+    "</div></div>";
+}
+
+/* Kevyt päivitys vedon aikana: vain kuva ja luvut, ei koko sivua. Isoa
+   pakkaa ei rakenneta kesken vedon, vaan vasta kun ote irtoaa. */
+function paintPrevNums(){
+  var n1=document.getElementById("pvn1"),n2=document.getElementById("pvn2");
+  if(n1)n1.textContent=setupQ()+1;
+  if(n2)n2.textContent=S.setup.cards;
+}
+
+/* Kortit piirretään lyhyellä viiveellä, ettei niitä rakenneta uudelleen
+   jokaisesta liu'un pykälästä. Luvut päivittyvät heti. */
+function paintPrevCards(){
+  var el=document.getElementById("pvcards");
+  if(!el)return;
+  el.innerHTML=cardsHTML(modelFor(setupQ()));
+}
+
+function paintPreview(){
+  paintPrevNums();
+  clearTimeout(S.pvT);
+  S.pvT=setTimeout(paintPrevCards,70);
+}
+
+function optsHTML(dis){
+  var C=shownSetup(dis),d=dis?" disabled":"",q=C.q,nc=q*q+q+1;
+  var h='<div class="opts">';
+  h+='<h3>Kuvia kortilla <b id="labq">'+(q+1)+"</b></h3>";
+  h+='<input type="range" class="sl" id="slq" min="0" max="'+(SIZES.length-1)+
+     '" step="1" value="'+C.qi+'"'+d+' aria-label="Kuvia kortilla">';
+  h+='<div class="ends"><span>'+(SIZES[0]+1)+"</span><span>"+
+     (SIZES[SIZES.length-1]+1)+"</span></div>";
+  h+='<h3>Kortteja matsissa <b id="labc">'+C.cards+"</b></h3>";
+  h+='<input type="range" class="sl" id="slc" min="'+CARDS_MIN+'" max="'+CARDS_MAX+
+     '" step="'+CARDS_STEP+'" value="'+C.cards+'"'+d+' aria-label="Kortteja matsissa">';
+  h+='<div class="ends"><span>'+CARDS_MIN+"</span><span>"+CARDS_MAX+"</span></div>";
+  h+='<p class="sub" id="optsub">'+subTeksti(q,C.cards)+"</p></div>";
+  return h;
+}
+
+/* Pelitavan valinta yläreunassa. Erillistä aloitussivua ei ole. */
+function modeHTML(){
+  var solo=(S.screen==="solo-setup"||S.screen==="solo"||S.screen==="solo-done");
+  return '<div class="modes'+(solo?" left":" right")+'">'+
+    '<button class="mode'+(solo?" on":"")+'" data-go="solo-setup">Yksinpeli</button>'+
+    '<button class="mode'+(!solo?" on":"")+'" data-go="lobbies"'+
+    (netOn()?"":" disabled")+">Moninpeli</button></div>";
+}
+
+
+function viewLobbies(){
+  var h="";
+  if(S.blocked)
+    h+='<p class="need"><b>Vanha versio.</b> Peli on päivittynyt versioon v'+S.blocked.min+
+       '. <button class="lnk" id="hardreset">Päivitä nyt</button></p>';
+  if(!netOn())
+    return h+'<p class="need"><b>Moninpeli tarvitsee tietokannan.</b> Kun kortti vaihtuu '+
+      "kaikilla yhtä aikaa, tilaa ei voi johtaa kellosta — se pitää jakaa oikeasti. Avaa "+
+      "<code>config.js</code> ja liitä Firebase-kannan osoite; ohje on LUEMINUT.md:ssä "+
+      "kohdassa <b>Moninpeli</b>. Yksinpeli toimii jo nyt.</p>";
+  h+=nickHTML();
+  h+='<div class="rowbtn" style="margin:0 0 14px"><button class="btn" id="mklobby">Luo uusi aula</button></div>';
+  h+='<div class="board"><h3>Avoimet aulat</h3>';
+  if(S.lobErr)h+='<p class="empty">'+esc(S.lobErr)+"</p>";
+  else if(!S.lobbies.length)
+    h+='<p class="empty">Ei avoimia auloja.<br>Luo uusi ja jaa koodi kavereille.</p>';
+  else S.lobbies.forEach(function(L){
+    var vanha=(L.v!==null&&L.v!==PROTO);
+    h+='<button class="lob'+(vanha?" old":"")+'" data-join="'+L.code+'"'+
+       (vanha?" disabled":"")+'><span class="cd">'+L.code+"</span>"+
+       '<span class="inf">'+(vanha?("eri versio (v"+L.v+")"):
+         (L.n+(L.n===1?" pelaaja":" pelaajaa")+" · "+(L.q+1)+" kuvaa"))+"</span>"+
+       '<span class="st'+(L.state==="play"?" play":"")+'">'+
+       (vanha?"ei yhteensopiva":L.state==="play"?"käynnissä":
+        L.state==="done"?"tulokset":"aula")+"</span></button>";
+  });
+  h+="</div>";
+  h+='<div class="join"><input id="jcode" maxlength="4" placeholder="KOODI" aria-label="Aulan koodi">'+
+     '<button class="btn" id="jgo">Liity</button></div>';
+  h+='<p class="foot">Dobble '+APPVER+" · "+
+     (NET.state==="live"?"yhteys toimii":NET.state==="error"?"ei yhteyttä":"yhdistetään…")+
+     ' · <button class="lnk" id="hardreset">päivitä sovellus</button></p>';
+  return h;
+}
+
+function viewSoloSetup(){
+  var h="";
+  if(S.blocked)
+    h+='<p class="need"><b>Vanha versio.</b> Peli on päivittynyt versioon v'+S.blocked.min+
+       '. <button class="lnk" id="hardreset">Päivitä nyt</button></p>';
+  h+=previewHTML(false);
+  h+=optsHTML(false);
+  h+='<div class="rowbtn"><button class="btn" id="gosolo">Aloita</button></div>';
+  return h;
+}
+
+function viewSolo(){
+  var P=S.solo,m=modelFor(P.q);
+  var h='<div class="bar"><span class="ph play">Yksin</span>'+
+    '<span class="mid2">'+P.round+" / "+P.cards+"</span>"+
+    '<span class="rt"><b id="clk">'+((nowMs()-P.t0)/1000).toFixed(1)+"</b> s</span>"+
+    '<button class="x" data-go="solo-setup" aria-label="Poistu">✕</button></div>';
+  h+='<div class="stack'+(locked()?" shake":"")+'" id="pair">'+
+     '<div class="disc" data-c="'+P.a+'"></div><div class="disc" data-c="'+P.b+'"></div></div>';
+  h+='<div id="below">'+hintHTML()+"</div>";
+  return h;
+}
+
+function viewSoloDone(){
+  var P=S.solo,secs=(P.tEnd-P.t0)/1000;
+  var h='<div class="wait"><h2>Valmis</h2><div class="big">'+secs.toFixed(1)+
+    '</div><p>sekuntia · '+P.score+" kuvaa<br>"+(secs/P.cards).toFixed(2)+
+    " s / kortti · "+P.miss+(P.miss===1?" virhe":" virhettä")+
+    (P.miss?" (+"+(P.miss*PENALTY/1000)+" s sakkoa)":"")+"</p></div>";
+  h+='<div class="rowbtn"><button class="btn" id="gosolo">Uudestaan</button>'+
+     '<button class="btn ghost" data-go="lobbies">Moninpeliin</button></div>';
+  return h;
+}
+
+/* Kyltti luodaan body-tasolle, ei app-säiliöön: näin se kelluu kaiken
+   päällä, uudelleenpiirto ei katkaise animaatiota eikä se siirrä kortteja. */
+var toastEl=null,toastT=null,toastT2=null;
+
+function toastNode(){
+  if(toastEl)return toastEl;
+  try{
+    toastEl=document.createElement("div");
+    toastEl.id="toast";
+    toastEl.hidden=true;
+    document.body.appendChild(toastEl);
+  }catch(e){toastEl=null;}
+  return toastEl;
+}
+
+function showToast(name,mine,ms){
+  /* Milloin kyltti on kokonaan poissa — juhlinta odottaa tätä. */
+  S.toastEnd=nowMs()+Math.max(300,ms)+300;
+  var el=toastNode();
+  if(!el)return;
+  clearTimeout(toastT);clearTimeout(toastT2);
+  el.className=mine?"mine":"";
+  el.innerHTML=mine?"<b>Sinä</b> sait pisteen":"<b>"+esc(name)+"</b> sai pisteen";
+  el.hidden=false;
+  /* animaatio alusta myös peräkkäisillä pisteillä */
+  try{el.style.animation="none";el.offsetHeight;el.style.animation="";}catch(e){}
+  toastT=setTimeout(function(){
+    if(!toastEl)return;
+    toastEl.className=(toastEl.className?toastEl.className+" ":"")+"out";
+    toastT2=setTimeout(hideToast,280);
+  },Math.max(300,ms));
+}
+
+function hideToast(){
+  clearTimeout(toastT);clearTimeout(toastT2);
+  if(toastEl){toastEl.hidden=true;toastEl.className="";}
+}
+
+/* Pisterivi näyttää nyt aina saman, koska kyltti ei enää vie sen paikkaa. */
+function boardHTML(title){
+  var list=scoresList(),st=roomState();
+  var h='<div class="board" id="board"><h3>'+title+" · "+list.length+
+    (list.length===1?" pelaaja":" pelaajaa")+"</h3>";
+  list.slice(0,14).forEach(function(p,i){
+    var out=(st==="play"&&!p.inGame);
+    h+='<div class="row'+(p.id===S.me.id?" me":"")+(out?" out":"")+'">'+
+      '<span class="r">'+(out?"–":(i+1)+".")+'</span>'+
+      '<span class="nm">'+esc(p.n)+"</span>"+
+      (p.host?'<span class="tag host">isäntä</span>':"")+
+      (out?'<span class="tag">odottaa</span>':"")+
+      '<span class="sc">'+p.s+"</span></div>";
+  });
+  return h+"</div>";
+}
+
+function viewMP(){
+  var st=roomState(),host=iAmHost(),h="";
+  var inGame=!!(ROOM&&ROOM.roster&&ROOM.roster[S.me.id]);
+  var q=(ROOM&&ROOM.q)||setupQ(),cards=(ROOM&&ROOM.cards)||S.setup.cards;
+  var m=modelFor(q),r=(ROOM&&ROOM.round)||0;
+
+  var bare=(st==="play"&&inGame);
+  if(!bare)h+='<button class="back" data-go="lobbies">← Aulalistaan</button>';
+  /* Palkki vain pelin aikana: siellä se näyttää kierroslaskurin ja isännän
+     lopetuspainikkeen. Aulassa ja tuloksissa se vain toisti tietoja. */
+  if(st==="play"){
+    h+='<div class="bar"><span class="ph play">Käynnissä</span>'+
+       '<span class="mid2" id="hudr">'+r+" / "+cards+"</span>"+
+       '<span class="sc2"><b id="hudp">'+((ROOM.scores&&ROOM.scores[S.me.id])||0)+
+       "</b>p</span>";
+    if(bare&&host)h+='<button class="stop" id="gostop">Lopeta</button>';
+    if(bare)h+='<button class="x" data-go="lobbies" aria-label="Poistu">✕</button>';
+    h+="</div>";
+  }
+
+  /* Eri versiolla tehtyyn aulaan ei voi liittyä: pelin toiminta eroaisi. */
+  if(!roomOk()){
+    h+='<div class="wait blk"><h2>Aula käyttää eri versiota</h2>'+
+       "<p>Tämä aula on tehty versiolla v"+roomVer()+", sinulla on v"+PROTO+
+       ".<br>Valitse toinen aula tai luo uusi.</p></div>";
+    h+='<div class="rowbtn"><button class="btn ghost" data-go="lobbies">Aulalistaan</button>'+
+       '<button class="btn" id="hardreset">Päivitä</button></div>';
+    return h;
+  }
+
+  if(st==="lobby"){
+    h+=nickHTML();
+    if(host){
+      h+='<div class="wait"><h2>Olet isäntä</h2>'+
+         "<p>Valitse asetukset ja aloita, kun väkeä on tarpeeksi.</p></div>";
+      h+=qrHTML();
+      h+=previewHTML(false);
+      h+=optsHTML(false);
+      h+='<div class="rowbtn"><button class="btn" id="gostart">Aloita matsi</button></div>';
+    }else{
+      var hn=scoresList().filter(function(p){return p.host;})[0];
+      h+='<div class="wait"><h2>Odotetaan isäntää</h2><p>'+
+         esc(hn?hn.n:"—")+" valitsee asetukset ja aloittaa.</p></div>";
+      h+=qrHTML();
+      h+=previewHTML(true);
+    }
+    h+=boardHTML("Aulassa");
+    h+=chatHTML();
+    return h;
+  }
+
+  if(st==="play"&&!inGame){
+    h+='<div class="wait"><h2>Matsi on jo käynnissä</h2><p>Pääset mukaan seuraavaan.<br>'+
+       "Kortti "+r+" / "+cards+"</p></div>";
+    h+=boardHTML("Tilanne");
+    return h;
+  }
+
+  /* Tulossivu vasta kun viimeisen kortin paljastus on ohi. */
+  if(st==="play"||(st==="done"&&!cardLive())){
+    var live=(st==="play")&&cardLive();
+    /* Ennen heräämistä näytetään edellinen kortti oikea kuva korostettuna.
+       Jos edellistä ei ole (matsin alku), kortit peitetään kokonaan —
+       muuten ne ehtisi silmäillä etukäteen. */
+    var rev=naytettava();
+    var veil=(!live&&!rev);
+    var A=rev?rev.a:(ROOM.deal?ROOM.deal.a:0);
+    var B=rev?rev.b:(ROOM.deal?ROOM.deal.b:1);
+    h+='<div class="stack'+(veil?" veil":"")+'" id="pair">'+
+       '<div class="disc" data-c="'+A+'"></div><div class="disc" data-c="'+B+'"></div>'+
+       (veil?'<div class="veilmsg"><span>Valmiina</span><b id="cdn">'+
+         (waitMs()/1000).toFixed(1)+"</b></div>":"")+"</div>";
+    /* Ohjeteksti pysyy paikallaan koko ajan, jottei rivi vilku. */
+    h+='<div id="below">'+hintHTML()+"</div>";
+    return h;
+  }
+
+  h+=korokeHTML();
+  h+='<div class="tulokset'+(S.tuloksetNakyy?" nakyy":"")+'" id="tulokset">'+
+     boardHTML("Lopputulokset");
+  if(host)h+='<div class="rowbtn"><button class="btn" id="goreset">Uusi matsi</button></div>';
+  else h+='<p class="hint">Isäntä voi aloittaa uuden matsin.</p>';
+  return h+"</div>";
+}
+
+function viewBlocked(){
+  var h='<div class="wait blk"><h2>Peli on päivittynyt</h2>'+
+    "<p>Käytössäsi on vanha versio, eikä sillä voi pelata.<br>"+
+    "Päivitys kestää hetken.</p>"+
+    '<div class="vers"><span>sinulla</span><b>v'+PROTO+"</b>"+
+    "<span>uusin</span><b>v"+S.blocked.min+"</b></div></div>";
+  h+='<div class="rowbtn"><button class="btn" id="hardreset">Päivitä nyt</button></div>';
+  h+='<p class="foot">Painike tyhjentää välimuistin ja lataa pelin uudelleen. '+
+     "Pakka ja Rakenne toimivat myös vanhalla versiolla.</p>";
+  return h;
+}
+
+function viewPlay(){
+  if(S.blocked)return viewBlocked();
+  if(S.screen==="lobbies")return viewLobbies();
+  if(S.screen==="solo-setup")return viewSoloSetup();
+  if(S.screen==="solo")return viewSolo();
+  if(S.screen==="solo-done")return viewSoloDone();
+  return viewMP();
+}
+
+/* ================= pakka ja rakenne ================= */
+function ladderHTML(){
+  var m=S.m,h="";
+  if(S.lad){
+    h+='<p class="eyebrow">Äärellinen projektiivinen taso · PG(2, q)</p><div class="ladder">';
+    RUNGS.forEach(function(r){
+      var cls="rung"+(r.st?" "+r.st:"")+(S.q===r.q?" on":"");
+      var sub=r.st?("q="+r.q):(fmt(r.q*r.q+r.q+1)+" korttia");
+      h+='<button class="'+cls+'" data-q="'+r.q+'"><span class="n">'+(r.q+1)+
+        (r.st==="open"?"?":"")+'</span><span class="s">'+sub+"</span></button>";
+    });
+    h+="</div>";
+    h+='<p class="readout"><b>'+m.percard+"</b> kuvaa kortilla · <b>"+fmt(m.ncard)+
+       "</b> korttia · q = "+m.q+' <button class="hide" id="ladt">piilota</button></p>';
+  }else{
+    h+='<button class="ladbar" id="ladt"><b>'+m.percard+"</b> kuvaa kortilla <i>"+
+       fmt(m.ncard)+" korttia</i><em>vaihda</em></button>";
+  }
+  if(S.msg)h+='<p class="msg"><i>'+(S.msg.open?"?":"✕")+"</i><span>"+S.msg.text+"</span></p>";
+  return h;
+}
+
+function viewDeck(){
+  var m=S.m,a=S.sel.a,b=S.sel.b,t=shared(m,a,b);
+  var h='<div class="stack" id="pair">'+
+    '<div class="disc" data-c="'+a+'"></div><div class="disc" data-c="'+b+'"></div></div>';
+  h+='<div id="below"><p class="line">'+(t==null?
+    '<span style="color:var(--mute)">Valitse kaksi eri korttia.</span>':
+    "Kortit <b>"+(a+1)+"</b> ja <b>"+(b+1)+'</b> jakavat kuvan <span class="ig">'+
+    symInline(m,t)+"</span> — eikä mitään muuta.")+"</p>";
+  h+='<div class="picker">';
+  [["a","Kortti A",a],["b","Kortti B",b]].forEach(function(x){
+    h+='<label class="step"><span>'+x[1]+"</span><div>"+
+      '<button data-nudge="'+x[0]+'" data-d="-1">−</button>'+
+      '<input type="number" min="1" max="'+m.ncard+'" value="'+(x[2]+1)+'" data-in="'+x[0]+'">'+
+      '<button data-nudge="'+x[0]+'" data-d="1">+</button></div></label>';
+  });
+  h+='<button class="btn ghost" id="rndpair">Satunnainen</button></div>';
+  /* Hakemisto kääreen sisällä, jotta korttien mitoitus varaa sille tilan. */
+  if(m.ncard<=183){
+    h+='<p class="idxh">Kaikki '+m.ncard+' korttia</p><div class="idx">';
+    for(var i=0;i<m.ncard;i++)
+      h+='<button class="chip'+(i===a||i===b?" on":"")+'" data-card="'+i+'">'+(i+1)+"</button>";
+    h+="</div>";
+  }
+  return h+"</div>";
+}
+
+function viewStruct(){
+  var m=S.m,s=statsOf(m),F=m.F;
+  var h='<p class="hint" style="text-align:left;margin:0">'+fmt(m.nsym)+" × "+fmt(m.ncard)+
+    " esiintyvyysmatriisi. Rivi = kuva, sarake = kortti. Napauta kahta saraketta.</p>";
+  h+='<canvas id="mtx"></canvas>';
+  var hit=(S.mtx.length===2)?shared(m,S.mtx[0],S.mtx[1]):null;
+  h+='<p class="line" style="margin:0 0 16px">'+(hit==null?
+    '<span style="color:var(--mute)">Valitse kaksi saraketta.</span>':
+    "Sarakkeet <b>"+(S.mtx[0]+1)+"</b> ja <b>"+(S.mtx[1]+1)+
+    '</b> osuvat päällekkäin vain rivillä <span class="ig">'+symInline(m,hit)+"</span>")+"</p>";
+  h+='<dl class="facts">'+
+    "<div><dt>Kuvaa / kortti</dt><dd>"+m.percard+'</dd><dd class="sub">q + 1</dd></div>'+
+    "<div><dt>Kuvia</dt><dd>"+fmt(m.nsym)+'</dd><dd class="sub">q² + q + 1</dd></div>'+
+    "<div><dt>Kortteja</dt><dd>"+fmt(m.ncard)+'</dd><dd class="sub">yhtä monta kuin kuvia</dd></div>'+
+    "<div><dt>Korttia / kuva</dt><dd>"+m.percard+'</dd><dd class="sub">sama luku, symmetria</dd></div>'+
+    '<div class="w"><dt>'+(s.sampled?"Tarkistettu otos":"Tarkistetut parit")+"</dt><dd>"+
+    fmt(s.ok)+" / "+fmt(s.checked)+' ✓</dd><dd class="sub">'+
+    (s.sampled?("kaikkiaan "+fmt(s.total)+" paria — satunnaisotos "+s.ms+" ms, ei poikkeamia"):
+    ("tarkistus "+s.ms+" ms — jokainen pari jakaa täsmälleen yhden kuvan"))+"</dd></div></dl>";
+  h+='<p class="note">'+(F.k===1?
+    ("q = "+m.q+" on alkuluku, joten kortit rakentuvat tavallisella jakojäännöslaskennalla mod "+m.q+"."):
+    ("q = "+m.q+" ei ole alkuluku vaan "+F.p+"^"+F.k+". Mod "+m.q+
+     " ei muodosta kuntaa, joten tarvitaan laajennettu kunta GF("+F.p+"^"+F.k+")."))+
+    " Kuvat ovat tason pisteitä ja kortit suoria; kaksi suoraa leikkaa aina yhdessä pisteessä.</p>";
+  h+='<p class="note">'+(m.emo?
+    ("Kuvina käytetään emojeita. Niitä on valikoimassa "+fmt(EMOJI.length)+
+     ", mikä riittää kaikkiin pakkoihin joissa on enintään 32 kuvaa kortilla."):
+    ("Emojit eivät riitä "+fmt(m.nsym)+" kuvaan, joten kuvat piirretään yhdistelminä: "+
+     NS+" muotoa × "+NH+" sävyä × "+NF+" täyttöä × "+NM+" sisämerkkiä = "+
+     fmt(COMBOS)+" erottuvaa kuvaa."))+"</p>";
+  return h;
+}
+
+/* ================= piirto ================= */
+function hsl2rgb(h,s,l){
+  var C=(1-Math.abs(2*l-1))*s,X=C*(1-Math.abs((h/60)%2-1)),mm=l-C/2,r,g,b;
+  if(h<60){r=C;g=X;b=0;}else if(h<120){r=X;g=C;b=0;}
+  else if(h<180){r=0;g=C;b=X;}else if(h<240){r=0;g=X;b=C;}
+  else if(h<300){r=X;g=0;b=C;}else{r=C;g=0;b=X;}
+  return [((r+mm)*255)|0,((g+mm)*255)|0,((b+mm)*255)|0];
+}
+
+function drawMatrix(){
+  var cv=document.getElementById("mtx");
+  if(!cv)return;
+  var m=S.m,CELL=Math.min(40,Math.max(1,Math.round(760/m.ncard)));
+  var full=m.ncard*CELL,CAP=1400,sf=full>CAP?CAP/full:1;
+  var W=Math.max(120,Math.round(full*sf));
+  cv.width=W;cv.height=W;
+  var x=cv.getContext("2d"),c,k;
+  if(!m.pal){
+    m.pal=new Uint8Array(m.nsym*3);
+    for(k=0;k<m.nsym;k++){var rgb=hsl2rgb(k*360/m.nsym,.68,.56);
+      m.pal[k*3]=rgb[0];m.pal[k*3+1]=rgb[1];m.pal[k*3+2]=rgb[2];}
+  }
+  if(CELL===1){
+    var img=x.createImageData(W,W),d=img.data,i;
+    for(i=0;i<d.length;i+=4){d[i]=14;d[i+1]=20;d[i+2]=48;d[i+3]=255;}
+    for(c=0;c<m.ncard;c++){
+      var sy=syms(m,c),px=(c*sf)|0;
+      for(k=0;k<sy.length;k++){var r=sy[k],py=(r*sf)|0,o=(py*W+px)*4;
+        d[o]=m.pal[r*3];d[o+1]=m.pal[r*3+1];d[o+2]=m.pal[r*3+2];d[o+3]=255;}
+    }
+    x.putImageData(img,0,0);
+  }else{
+    x.fillStyle="#0E1430";x.fillRect(0,0,W,W);
+    for(c=0;c<m.ncard;c++){
+      var sy2=syms(m,c),sel=S.mtx.indexOf(c)>=0;
+      for(k=0;k<sy2.length;k++){var r2=sy2[k];
+        x.globalAlpha=sel?1:.6;
+        x.fillStyle="rgb("+m.pal[r2*3]+","+m.pal[r2*3+1]+","+m.pal[r2*3+2]+")";
+        x.fillRect(c*CELL,r2*CELL,CELL,CELL);}
+    }
+    x.globalAlpha=1;
+  }
+  var g=Math.max(3,CELL*sf);
+  x.fillStyle="rgba(255,201,74,.30)";
+  S.mtx.forEach(function(cc){x.fillRect(cc*CELL*sf+CELL*sf/2-g/2,0,g,W);});
+  if(S.mtx.length===2){
+    var hit=shared(m,S.mtx[0],S.mtx[1]);
+    x.fillRect(0,hit*CELL*sf+CELL*sf/2-g/2,W,g);
+    x.strokeStyle="#FFC94A";x.lineWidth=Math.max(2,CELL*sf/2);
+    var rad=Math.max(8,CELL*sf*1.6);
+    S.mtx.forEach(function(cc){
+      x.beginPath();x.arc(cc*CELL*sf+CELL*sf/2,hit*CELL*sf+CELL*sf/2,rad,0,Math.PI*2);x.stroke();});
+  }
+}
+
+/* Etäisyys sivun alusta. getBoundingClientRect antaisi etäisyyden näkymän
+   yläreunasta, jolloin korttien koko muuttuisi vierittäessä. */
+function docTop(el){
+  var y=0;
+  while(el){y+=el.offsetTop||0;el=el.offsetParent;}
+  return y;
+}
+
+/* Näkymän korkeus. Firefoxissa Androidilla innerHeight sisältää osoiterivin
+   alta piiloon jäävän alueen, joten kortit asettuisivat väärään kohtaan. */
+function vh(){
+  try{
+    if(window.visualViewport&&window.visualViewport.height)
+      return window.visualViewport.height;
+  }catch(e){}
+  return window.innerHeight;
+}
+
+function fitStack(){
+  var st=document.getElementById("pair");
+  if(!st)return;
+  var wide=window.innerWidth>vh()*1.05;
+  st.classList.toggle("row",wide);
+  st.style.width="";
+  var box=st.parentNode.clientWidth;
+  var below=document.getElementById("below");
+  var reserve=(below?below.offsetHeight:0)+12;
+  var availH=vh()-docTop(st)-reserve;
+  var gap=8,w;
+  if(wide)w=Math.min((box-gap)/2,availH);
+  else w=Math.min(box,(availH-gap)/2);
+  w=Math.max(130,Math.min(w,620));
+  st.style.width=Math.round(wide?w*2+gap:w)+"px";
+}
+
+/* Korostaa oikean kuvan ja himmentää muut koskematta korttien sisältöön.
+   Uudelleenpiirto juuri animaation alkaessa aiheutti töksähdyksen. */
+/* Rengas animoidaan täsmälleen kerran kierrosta kohti, paikallisesti.
+   Kun kuva on kerran korostettu, mikään myöhempi tapahtuma — palvelimen
+   vahvistus, uudelleenpiirto tai tikitys — ei käynnistä animaatiota
+   uudestaan. Tunnisteena on kierrosnumero, ei kuva: sama kuva voi osua
+   kahdelle peräkkäiselle kierrokselle. */
+/* Kehä luodaan kerran ja animaatio soitetaan suoraan sille. Jos kehä on jo
+   paikallaan, mitään ei tehdä — silloin animaatio ei voi alkaa uudestaan. */
+function lisaaKeha(el,animoi){
+  if(!el)return;
+  /* Viite katoaa kun kortti piirretään uusiksi, mutta kehä voi silti olla
+     valmiina merkinnässä. Tarkistetaan myös se, jottei niitä tule kahta. */
+  if(!el._keha&&el.querySelector)try{el._keha=el.querySelector(".ring");}catch(e){}
+  if(el._keha)return;
+  var r;
+  try{
+    r=document.createElement("i");
+    r.className="ring";
+    el.appendChild(r);
+  }catch(e){return;}
+  el._keha=r;
+  if(!animoi)return;
+  try{
+    if(r.animate)r.animate(
+      [{transform:"scale(.55)",opacity:0},{transform:"scale(1)",opacity:1}],
+      {duration:340,easing:"cubic-bezier(.2,1.4,.45,1)"});
+  }catch(e2){}
+}
+
+function poistaKeha(el){
+  if(!el||!el._keha)return;
+  try{el.removeChild(el._keha);}catch(e){}
+  el._keha=null;
+}
+
+/* Tunnisteena jaon oma siemen, ei kierrosnumero. Siemen on satunnainen ja
+   yksilöi kortin täsmällisesti, eikä sitä nollata missään — kierrosnumero
+   nollaantui aina kun uusi kortti piirrettiin, jolloin suoja katosi ja
+   seuraava korostus animoitui uudestaan. */
+function korostaKortit(sym,siemen){
+  var st=document.getElementById("pair");
+  if(!st)return false;
+  if(sym==null)return false;
+  var slots=st.querySelectorAll(".slot");
+  if(!slots||!slots.length)return false;
+  /* Tämän kortin kehä on jo näytetty: ei kosketa mihinkään. */
+  if(siemen!=null&&S.ringSeed===siemen)return true;
+  for(var i=0;i<slots.length;i++){
+    var el=slots[i],s=+((el.dataset&&el.dataset.s)||-1);
+    if(s===sym){
+      el.className="slot hit";
+      lisaaKeha(el,true);
+    }else{
+      el.className="slot dim";
+      poistaKeha(el);
+    }
+  }
+  if(siemen!=null)S.ringSeed=siemen;
+  return true;
+}
+
+/* Mitä korteilla näytetään: paljastus, oma odottava valinta vai pelattava
+   kortti. Aiemmin tämä kulki #pair-elementin data-rev-attribuutin kautta,
+   joka saattoi eriytyä varsinaisesta tilasta — silloin korostus katosi
+   hetkeksi ja ilmestyi uudestaan. Nyt lähde on yksi ja sama. */
+function naytettava(){
+  if(!cardLive()&&S.reveal&&S.reveal.a!=null)return S.reveal;
+  if(S.pending&&S.pendRev)return S.pendRev;
+  return null;
+}
+
+function paintCards(){
+  var uusiKeha=false;
+  var st=document.getElementById("pair");
+  if(!st)return;
+  var discs=st.querySelectorAll(".disc"),i,dw,m,o={},kortit=null;
+  if(S.tab!=="peli"){
+    m=S.m;
+    var t=shared(m,S.sel.a,S.sel.b);
+    o={match:t,dim:t!=null,label:true};
+    kortit=[S.sel.a,S.sel.b];
+  }else if(S.screen==="solo"){
+    m=modelFor(S.solo.q);o={seed:S.solo.seed,tap:!locked(),off:S.solo.off||0};
+    kortit=[S.solo.a,S.solo.b];
+  }else{
+    m=modelFor((ROOM&&ROOM.q)||setupQ());
+    var R=naytettava();
+    if(R){
+      o={seed:R.s||0,match:R.sym,dim:true,off:R.o||0};
+      kortit=[R.a,R.b];
+      /* Jos kehä syntyy vasta piirrossa, se animoidaan kerran jälkikäteen. */
+      uusiKeha=(R.s==null||S.ringSeed!==R.s);
+      if(R.s!=null)S.ringSeed=R.s;
+    }else{
+      o={seed:(ROOM&&ROOM.deal&&ROOM.deal.s)||0,off:(ROOM&&ROOM.deal&&ROOM.deal.o)||0,
+        tap:cardLive()&&!S.pending&&!locked()};
+      kortit=(ROOM&&ROOM.deal)?[ROOM.deal.a,ROOM.deal.b]:null;
+      /* HUOM: S.ringSeed EI nollaudu tässä. Uudella kortilla on uusi
+         siemen, joten kehä animoituu silti — mutta jo näytetty ei toistu. */
+    }
+  }
+  if(!kortit)return;
+
+  /* Korttinumerot tulevat tilasta, eivät DOM-attribuutista. Attribuutin
+     päivitti vain täysi piirto, joten kevyellä polulla ruudulle saattoi
+     jäädä edellisen kierroksen kortit — ja napautus hyväksyttiin niihin. */
+  var piirretty=false;
+  for(i=0;i<discs.length&&i<kortit.length;i++){
+    dw=discs[i].clientWidth;
+    if(!dw)continue;
+    var c=kortit[i];
+    if(discs[i].dataset)discs[i].dataset.c=c;
+    var oo={seed:o.seed,tap:o.tap,match:o.match,dim:o.dim,off:o.off};
+    if(o.label)oo.label=c+1;
+    discs[i].innerHTML=cardHTML(m,c,dw,oo);
+    piirretty=true;
+  }
+
+  /* Mikä jako on todella ruudulla. Merkitään vasta kun kortit on oikeasti
+     piirretty: muuten napautus kelpaisi vaikka ruudulla olisi vanha kortti. */
+  if(S.tab==="peli"&&S.screen!=="solo"){
+    if(!piirretty)S.shownDeal=null;
+    else S.shownDeal=(naytettava()==null&&ROOM&&ROOM.deal)?ROOM.deal.s:null;
+  }
+
+  /* Piirrossa syntynyt kehä animoidaan kerran. */
+  if(uusiKeha&&piirretty&&st)try{
+    var kehat=st.querySelectorAll(".ring");
+    for(i=0;i<kehat.length;i++)if(kehat[i].animate)kehat[i].animate(
+      [{transform:"scale(.55)",opacity:0},{transform:"scale(1)",opacity:1}],
+      {duration:340,easing:"cubic-bezier(.2,1.4,.45,1)"});
+  }catch(e){}
+}
+
+/* Kesken pelin otsikko ja välilehdet piilotetaan, jotta kortit saavat tilan.
+   Poistuminen hoituu tilapalkin painikkeesta. */
+function inPlay(){
+  if(S.tab!=="peli")return false;
+  if(S.screen==="solo")return true;
+  if(S.screen==="mp"&&roomState()==="play"&&ROOM&&ROOM.roster&&ROOM.roster[S.me.id])return true;
+  return false;
+}
+
+function render(){
+  /* Jos säädintä vedetään juuri nyt, piirtäminen odottaa: muuten elementti
+     katoaisi sormen alta kesken vedon. */
+  if(S.dragging){S.needRender=true;return;}
+  S.needRender=false;
+  /* Kesken kirjoitettu kenttä säilyy piirron yli. Koskee nimeä, aulakoodia
+     ja korttinumeroita — mikä tahansa niistä voi olla kohdistettuna kun
+     verkosta saapuu päivitys. */
+  var ae=null;
+  try{ae=document.activeElement;}catch(e){}
+  var keep=(ae&&ae.id&&ae.tagName==="INPUT"&&ae.type!=="range")?
+    {id:ae.id,v:ae.value,s:ae.selectionStart,e:ae.selectionEnd}:null;
+  /* Kohdistus palautetaan vain jos kenttään on juuri kirjoitettu. Muuten
+     .focus() avaisi näppäimistön uudelleen joka kerta kun jokin muu
+     pelaaja tekee jotain. */
+  var kirjoittaa=!!(keep&&S.typeId===keep.id&&nowMs()-(S.typeT||0)<1500);
+
+  var body=S.tab==="peli"?viewPlay():S.tab==="pakka"?viewDeck():viewStruct();
+  var bare=inPlay();
+  var inRoom=(S.tab==="peli"&&S.screen==="mp");
+  /* Pelin aikana sivu ei saa vieriä; kortit mitoitetaan näkymään. */
+  try{
+    var de=document.documentElement,bo=document.body;
+    var lukko=bare||(S.tab==="pakka");
+    /* Vieritys on nollattava ENNEN lukitusta. Muuten sivu jää siihen
+       kohtaan mihin se oli vieritetty, eikä sitä pääse enää liikuttamaan —
+       yläpalkki jää näkymän yläpuolelle. */
+    if(lukko&&!S.lukossa)try{window.scrollTo(0,0);}catch(e2){}
+    S.lukossa=lukko;
+    if(de&&de.classList)de.classList.toggle("pelissa",lukko);
+    if(bo&&bo.classList)bo.classList.toggle("pelissa",lukko);
+  }catch(e){}
+  /* Välilehdet piiloon pelin ja aulan sisällä: sieltä poistutaan
+     takaisin- ja sulkemispainikkeilla. */
+  var tabs=(!bare&&!inRoom)?tabsHTML():"";
+  /* Pelitavan valinta välilehtien alapuolelle. */
+  var modes=(S.tab==="peli"&&!bare&&!inRoom&&!S.blocked)?modeHTML():"";
+  var ladder=(S.tab==="peli")?"":ladderHTML();
+  /* Vanhasta versiosta kerrotaan joka välilehdellä, ei vain pelisivulla. */
+  var varoitus=(S.blocked&&S.tab!=="peli")?
+    ('<p class="need"><b>Vanha versio.</b> Peli on päivittynyt versioon v'+S.blocked.min+
+     '. <button class="lnk" id="hardreset">Päivitä nyt</button></p>'):"";
+  var top=bare?"":'<div class="toph"><b>Dobble</b></div>';
+  app.innerHTML=top+varoitus+ladder+tabs+modes+body;
+
+  if(keep){
+    var el=document.getElementById(keep.id);
+    if(el){
+      el.value=keep.v;
+      if(kirjoittaa)try{el.focus();el.setSelectionRange(keep.s,keep.e);}catch(e){}
+    }
+  }
+  /* Pidetään tikityksen vertailuarvo ajan tasalla, ettei se laukaisisi
+     ylimääräistä piirtoa kesken paljastuksen. */
+  if(S.screen==="mp"&&S.tab==="peli")S.wasLive=cardLive();
+  requestAnimationFrame(function(){
+    fitStack();paintCards();drawMatrix();paintDot();
+    var cl=document.getElementById("chatlog");
+    if(cl)try{cl.scrollTop=cl.scrollHeight;}catch(e){}
+  });
+}
+
+setInterval(function(){
+  if(S.tab!=="peli")return;
+  var need=false;
+  if(S.screen==="mp"&&S.tab==="peli"&&
+     (roomState()==="play"||roomState()==="done")){
+    var lv=cardLive();
+    if(lv!==S.wasLive){S.wasLive=lv;need=true;}
+    else if(!lv){
+      var cd=document.getElementById("cdn");
+      if(cd)cd.textContent=(waitMs()/1000).toFixed(1);
+    }
+  }
+  if(S.lock&&!locked()){S.lock=0;piilotaSakko();need=true;}
+  if(need){render();return;}
+  if(locked())naytaSakko();
+  else piilotaSakko();
+  var c=document.getElementById("clk");
+  if(c&&S.screen==="solo")c.textContent=((nowMs()-S.solo.t0)/1000).toFixed(1);
+},100);
+
+setInterval(function(){if(S.screen==="mp"){hostArbitrate();hostFinalize();hostRescue();}},1200);
+setInterval(function(){if(S.screen==="lobbies")loadLobbies();},3000);
+
+/* ================= tapahtumat ================= */
+function goto(where){
+  S.sig=null;S.lock=0;piilotaSakko();S.reveal=null;S.pendRev=null;S.pending=false;hideToast();
+  if(where!=="mp"&&S.code)leaveRoom();
+  S.screen=where;
+  if(where==="lobbies"){
+    checkVersion();
+    S.lobbies=[];S.lobSig=null;S.lobErr=null;lobTries=0;
+    loadLobbies();
+    setTimeout(function(){if(S.screen==="lobbies")loadLobbies();},900);
+  }
+  window.scrollTo(0,0);render();
+}
+
+function enterRoom(code){
+  if(S.blocked)return;
+  code=String(code||"").toUpperCase().replace(/[^A-Z]/g,"").slice(0,4);
+  if(code.length!==4)return;
+  if(S.code)leaveRoom();
+  joinRoom(code);
+  S.screen="mp";S.reveal=null;S.pendRev=null;S.pending=false;S.lock=0;hideToast();
+  window.scrollTo(0,0);render();
+}
+
+app.addEventListener("click",function(e){
+  if(e.target.id==="mtx"){
+    var cv=e.target,rc=cv.getBoundingClientRect();
+    var col=Math.floor((e.clientX-rc.left)/rc.width*S.m.ncard);
+    if(col<0||col>=S.m.ncard)return;
+    var ix=S.mtx.indexOf(col);
+    if(ix>=0)S.mtx.splice(ix,1);
+    else if(S.mtx.length===2)S.mtx=[S.mtx[1],col];
+    else S.mtx.push(col);
+    render();return;
+  }
+  audioOn();                                   /* avataan äänilupa ajoissa */
+  if(e.target.id==="dot"){reconnect();return;}
+  if(e.target.closest&&e.target.closest("#mute")){
+    MUTE=!MUTE;
+    try{localStorage.setItem("dobble_mute",MUTE?"1":"0");}catch(err){}
+    render();return;
+  }
+  var t=e.target.closest("button");
+  if(!t||t.disabled)return;
+
+  if(t.dataset.go){goto(t.dataset.go);return;}
+  if(t.dataset.join){enterRoom(t.dataset.join);return;}
+  if(t.id==="mklobby"){enterRoom(newCode());return;}
+  if(t.id==="hardreset"){hardReset();return;}
+  if(t.id==="send"){lahetaViesti();return;}
+  if(t.id==="copylink"){
+    var u=joinURL();
+    try{
+      if(navigator.clipboard&&navigator.clipboard.writeText)
+        navigator.clipboard.writeText(u).then(function(){
+          S.copied=true;render();
+          setTimeout(function(){S.copied=false;if(S.screen==="mp")render();},1600);
+        }).catch(function(){});
+    }catch(e){}
+    return;
+  }
+  if(t.id==="jgo"){
+    var f=document.getElementById("jcode");
+    if(f)enterRoom(f.value);
+    return;
+  }
+  if(t.id==="ladt"){S.lad=!S.lad;render();return;}
+  if(t.dataset.tab){
+    var nt=t.dataset.tab;
+    if(S.tab==="peli"&&nt!=="peli"&&S.code)leaveRoom();
+    S.tab=nt;window.scrollTo(0,0);render();return;
+  }
+  if(t.id==="gosolo"){soloStart();return;}
+  if(t.id==="gostart"){hostStart();return;}
+  if(t.id==="goreset"){hostReset();return;}
+  if(t.id==="gostop"){hostStop();return;}
+
+  if(t.dataset.q!==undefined){
+    var q=+t.dataset.q,r=null,i;
+    for(i=0;i<RUNGS.length;i++)if(RUNGS[i].q===q)r=RUNGS[i];
+    if(r.st){S.msg={text:r.why,open:r.st==="open"};render();}
+    else{S.q=q;S.msg=null;S.lad=false;S.m=modelFor(q);S.sel={a:0,b:1};S.mtx=[];render();}
+    return;
+  }
+  if(t.id==="rndpair"){
+    var n=S.m.ncard,a=Math.floor(Math.random()*n),b=Math.floor(Math.random()*(n-1));
+    if(b>=a)b++;
+    if(Math.random()<0.5){var tt=a;a=b;b=tt;}
+    S.sel={a:a,b:b};render();return;
+  }
+  if(t.dataset.nudge){
+    var key=t.dataset.nudge,d=+t.dataset.d,N=S.m.ncard;
+    S.sel[key]=(S.sel[key]+d+N)%N;render();return;
+  }
+  if(t.dataset.card!==undefined){
+    var ci=+t.dataset.card;
+    if(ci!==S.sel.a&&ci!==S.sel.b){S.sel.b=S.sel.a;S.sel.a=ci;render();}
+    return;
+  }
+
+  if(t.dataset.s!==undefined&&S.tab==="peli"){
+    if(locked()||S.blocked)return;
+    var sym=+t.dataset.s;
+    if(S.screen==="solo"){
+      var P=S.solo,mm=modelFor(P.q),tg=shared(mm,P.a,P.b);
+      if(sym===tg){
+        soitaBling();
+        P.score++;
+        if(P.round>=P.cards){P.tEnd=nowMs();S.screen="solo-done";render();return;}
+        P.round++;soloDeal();render();
+      }else{soitaTok();P.miss++;penalise();naytaSakko();render();}
+      return;
+    }
+    /* Kortti voi olla "elossa" hetkeä ennen kuin se ehditään piirtää.
+       Silloin ruudulla on vielä edellinen kortti, eikä sen kuvia saa
+       hyväksyä — muuten rengas piirtyisi vanhaan asetteluun ja sitten
+       uudestaan uuteen. */
+    if(S.screen==="mp"&&roomState()==="play"&&!S.pending&&cardLive()&&
+       ROOM&&ROOM.deal&&S.shownDeal===ROOM.deal.s&&
+       ROOM&&ROOM.roster&&ROOM.roster[S.me.id]){
+      var m2=modelFor(ROOM.q||7),tg2=shared(m2,ROOM.deal.a,ROOM.deal.b);
+      if(sym!==tg2){soitaTok();penalise();naytaSakko();paintCards();return;}
+      /* Painaja tarkisti vastauksen jo paikallisesti, joten kuva korostetaan
+         heti odottamatta palvelinta. Nimi ilmestyy kun voittaja on ratkennut. */
+      soitaBling();
+      S.pending=true;
+      /* Vain oma palaute: ei siirrä seuraavan kortin heräämistä. */
+      S.pendRev={a:ROOM.deal.a,b:ROOM.deal.b,s:ROOM.deal.s,o:ROOM.deal.o||0,
+        sym:sym,r:ROOM.round||1};
+      /* Vain kortit uusiksi. Koko sivun piirto nykäisisi juuri kun
+         korostusrenkaan animaatio alkaa. */
+      if(!korostaKortit(sym,ROOM.deal.s))paintCards();
+      put("/claims/"+(ROOM.round||1)+"/"+S.me.id,
+        {n:S.me.name.slice(0,18),y:sym,t:{".sv":"timestamp"}});
+      /* Varmistus siltä varalta ettei vastausta kuulu. Vanha ajastin on
+         peruttava ja uuden on tunnistettava OMA painalluksensa: muuten
+         edellisen kierroksen ajastin sammuttaisi juuri tehdyn korostuksen. */
+      clearTimeout(S.pendT);
+      var omaSiemen=ROOM.deal.s;
+      S.pendT=setTimeout(function(){
+        if(S.pending&&S.pendRev&&S.pendRev.s===omaSiemen){
+          S.pending=false;S.pendRev=null;
+          if(S.tab==="peli"&&S.screen==="mp")render();
+        }
+      },2600);
+    }
+    return;
+  }
+});
+
+/* Liu'ut päivittävät lukeman ilman koko sivun piirtoa, jotta veto ei katkea. */
+app.addEventListener("input",function(e){
+  var t=e.target;
+  if(t&&t.id&&t.tagName==="INPUT"){S.typeId=t.id;S.typeT=nowMs();}
+  if(t.id==="nick"){
+    var v=t.value.trim().slice(0,18);
+    if(!v)return;
+    S.me.name=v;
+    try{localStorage.setItem("dobble_name",v);}catch(err){}
+    clearTimeout(S.nickT);
+    S.nickT=setTimeout(function(){beat();paintBoard();},400);
+    return;
+  }
+  if(t.id==="jcode"){
+    var cv=t.value.toUpperCase().replace(/[^A-Z]/g,"").slice(0,4);
+    if(cv!==t.value){
+      var pos=t.selectionStart;
+      t.value=cv;
+      try{t.setSelectionRange(pos,pos);}catch(err){}
+    }
+    return;
+  }
+  if(t.id==="slq"||t.id==="slc"){
+    /* Vedon aikana päivitetään vain lukemat. Koko sivun piirtäminen tuhoaisi
+       säätimen kesken kaiken, jolloin veto katkeaisi. */
+    if(t.id==="slq")S.setup.qi=+t.value;else S.setup.cards=+t.value;
+    var lq=document.getElementById("labq"),lc=document.getElementById("labc"),
+        sb=document.getElementById("optsub");
+    if(lq)lq.textContent=setupQ()+1;
+    if(lc)lc.textContent=S.setup.cards;
+    if(sb)sb.textContent=subTeksti(setupQ(),S.setup.cards);
+    paintPreview();
+  }
+});
+
+app.addEventListener("change",function(e){
+  var t=e.target;
+  if(t.id==="slq"||t.id==="slc"){
+    /* change laukeaa vasta kun ote irtoaa. */
+    if(t.id==="slq")S.setup.qi=+t.value;else S.setup.cards=+t.value;
+    modelFor(setupQ());pushSetup();render();
+    return;
+  }
+  if(t.id==="nick"){
+    var v=t.value.trim().slice(0,18);
+    if(v){S.me.name=v;try{localStorage.setItem("dobble_name",v);}catch(err){}beat();}
+    else t.value=S.me.name;
+    return;
+  }
+  if(t.dataset&&t.dataset.in){
+    var v2=parseInt(t.value,10);
+    if(!isNaN(v2)&&v2>=1&&v2<=S.m.ncard){S.sel[t.dataset.in]=v2-1;render();}
+  }
+});
+
+app.addEventListener("keydown",function(e){
+  if(e.target.id==="jcode"&&e.key==="Enter")enterRoom(e.target.value);
+  if(e.target.id==="msg"&&e.key==="Enter"){e.preventDefault();lahetaViesti();}
+});
+
+/* Pyyhkäisy vaihtaa yksinpelin ja moninpelin välillä aloitussivuilla.
+   Ei reagoi säätimiin eikä pystysuuntaiseen vieritykseen. */
+var swipe=null;
+
+function swipeOk(t){
+  if(S.tab!=="peli"||S.blocked||S.dragging)return false;
+  if(S.screen!=="solo-setup"&&S.screen!=="lobbies")return false;
+  if(t&&t.tagName==="INPUT")return false;
+  if(t&&t.classList&&t.classList.contains("sl"))return false;
+  return true;
+}
+
+app.addEventListener("touchstart",function(e){
+  if(!e.touches||e.touches.length!==1||!swipeOk(e.target)){swipe=null;return;}
+  swipe={x:e.touches[0].clientX,y:e.touches[0].clientY,t:Date.now(),ok:true};
+},{passive:true});
+
+app.addEventListener("touchmove",function(e){
+  if(!swipe||!e.touches||e.touches.length!==1){swipe=null;return;}
+  var dx=e.touches[0].clientX-swipe.x,dy=e.touches[0].clientY-swipe.y;
+  /* Pystyliike tulkitaan vieritykseksi, jolloin pyyhkäisy perutaan. */
+  if(Math.abs(dy)>18&&Math.abs(dy)>Math.abs(dx))swipe.ok=false;
+},{passive:true});
+
+app.addEventListener("touchend",function(e){
+  var s=swipe;swipe=null;
+  if(!s||!s.ok||!e.changedTouches||!e.changedTouches.length)return;
+  if(!swipeOk(e.target))return;
+  var dx=e.changedTouches[0].clientX-s.x,dy=e.changedTouches[0].clientY-s.y;
+  if(Date.now()-s.t>700)return;
+  if(Math.abs(dx)<60||Math.abs(dx)<Math.abs(dy)*1.6)return;
+  var solo=(S.screen==="solo-setup");
+  if(dx<0&&solo){if(netOn())goto("lobbies");}
+  else if(dx>0&&!solo)goto("solo-setup");
+});
+
+/* Vedon tunnistus, jotta uudelleenpiirto voidaan lykätä sen ajaksi. */
+function dragOn(e){
+  var t=e.target;
+  if(t&&t.classList&&t.classList.contains("sl"))S.dragging=true;
+}
+function dragOff(){
+  if(!S.dragging)return;
+  S.dragging=false;
+  if(S.needRender)render();
+}
+app.addEventListener("pointerdown",dragOn);
+app.addEventListener("touchstart",dragOn,{passive:true});
+window.addEventListener("pointerup",dragOff);
+window.addEventListener("pointercancel",dragOff);
+window.addEventListener("touchend",dragOff);
+window.addEventListener("touchcancel",dragOff);
+
+/* Sovellukseen palatessa tarkistetaan versio heti. */
+document.addEventListener("visibilitychange",function(){
+  if(!document.hidden){checkVersion();watchVersion();}
+});
+
+var rt=null;
+function sovitaMyohemmin(){
+  clearTimeout(rt);rt=setTimeout(function(){fitStack();paintCards();},150);
+}
+window.addEventListener("resize",sovitaMyohemmin);
+/* Osoiterivin piiloutuminen muuttaa näkymän korkeutta ilman resize-viestiä. */
+try{
+  if(window.visualViewport){
+    window.visualViewport.addEventListener("resize",sovitaMyohemmin);
+    window.visualViewport.addEventListener("scroll",sovitaMyohemmin);
+  }
+}catch(e){}
+/* Sivun sulkeutuessa EI poisteta pelaajaa: päivityksessä poisto ehtisi usein
+   uuden sivun liittymisen jälkeen ja pyyhkisi sen pois. Vanhentuneet rivit
+   suodattuvat muutenkin 12 sekunnissa. Nappia painamalla poistutaan heti. */
+
+/* ================= käynnistys ================= */
+netInit();
+checkVersion();
+watchVersion();
+S.m=modelFor(S.q);
+S.screen=netOn()?"lobbies":"solo-setup";
+var hash="";
+try{hash=(location.hash||"").replace("#","").toUpperCase().replace(/[^A-Z]/g,"");}catch(e){}
+if(netOn()&&hash.length===4)enterRoom(hash);
+else{if(S.screen==="lobbies")loadLobbies();render();}
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load",function(){
+    navigator.serviceWorker.register("sw.js").catch(function(){});
+  });
+}
+
+</script>
+</body>
+</html>
