@@ -1059,7 +1059,7 @@ var STALE=12000, BEAT=2500, REVEAL=1250, SETTLE=160, PENALTY=3000, FINALIZE=500;
 var LEAD=1600;   /* matsin ensimmäisen kortin varoaika, jotta kaikki ehtivät */
 /* Versionumero. Nostetaan aina kun pelin toiminta muuttuu niin, ettei
    vanha ja uusi versio voi pelata yhdessä. */
-var PROTO=62;
+var PROTO=63;
 var APPVER="v"+PROTO;
 var LOBBY_TTL=120000;                /* tätä vanhempi aula siivotaan */
 var CODE_ABC="ABCDEFGHJKLMNPRSTUVXY";  /* ilman sekoittavia I O Q Z W */
@@ -3003,12 +3003,15 @@ setInterval(function(){
      (roomState()==="play"||roomState()==="done")){
     var lv=cardLive();
     var cd=document.getElementById("cdn");
+    var pino=document.getElementById("pair");
     /* Katsotaan mitä ruudulla oikeasti on, ei mitä muistiin on merkitty.
        Muistiin merkitty tila saattoi kirjautua väärin, jos kortin
-       heräämisraja ylittyi näkymän laskemisen ja piirron välissä — silloin
-       peitto jäi ruudulle ja laskuri jäätyi lukemaan 0.0. */
+       heräämisraja ylittyi näkymän laskemisen ja piirron välissä. */
     if(cd&&lv)need=true;                 /* peitto näkyy, kortti jo elossa */
     else if(cd)cd.textContent=(waitMs()/1000).toFixed(1);
+    /* Matsi on ohi ja paljastus mennyt, mutta ruudulla on yhä kortit:
+       tulossivun pitäisi olla esillä. */
+    else if(pino&&lv&&roomState()==="done")need=true;
     else if(lv!==S.wasLive)need=true;
     S.wasLive=lv;
   }
