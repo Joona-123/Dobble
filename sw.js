@@ -5,7 +5,7 @@
    jolloin EventSource sai seuraavilla latauksilla valmiiksi päättyneen
    vastauksen elävän yhteyden sijaan — yhteys näytti katkenneen pysyvästi. */
 
-var CACHE = "dobble-v61";
+var CACHE = "dobble-v60";
 var FILES = [
   "./", "./index.html", "./manifest.json", "./config.js",
   "./icon-192.png", "./icon-512.png",

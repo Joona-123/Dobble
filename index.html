@@ -1059,7 +1059,7 @@ var STALE=12000, BEAT=2500, REVEAL=1250, SETTLE=160, PENALTY=3000, FINALIZE=500;
 var LEAD=1600;   /* matsin ensimmäisen kortin varoaika, jotta kaikki ehtivät */
 /* Versionumero. Nostetaan aina kun pelin toiminta muuttuu niin, ettei
    vanha ja uusi versio voi pelata yhdessä. */
-var PROTO=61;
+var PROTO=60;
 var APPVER="v"+PROTO;
 var LOBBY_TTL=120000;                /* tätä vanhempi aula siivotaan */
 var CODE_ABC="ABCDEFGHJKLMNPRSTUVXY";  /* ilman sekoittavia I O Q Z W */
@@ -1468,11 +1468,7 @@ function penalise(){S.lock=nowMs()+PENALTY;}
 var clockOff=0, clockRtt=1e9, clockOk=false;
 function serverNow(){return Date.now()+clockOff;}
 
-/* Yksi näyte ei riitä: jos se sattuu ruuhkaiseen hetkeen tai epäonnistuu,
-   pelaaja jää ilman kellosynkronointia ja hänen korttinsa herää oman
-   vastaanottohetkensä mukaan — eli eri aikaan kuin muilla. Otetaan sarja
-   näytteitä ja pidetään tarkin. */
-function kelloNayte(){
+function syncClock(){
   if(!netOn()||!S.code)return;
   var t0=Date.now();
   fetch(base()+"/players/"+S.me.id+"/ping.json",
@@ -1491,23 +1487,7 @@ function kelloNayte(){
     }).catch(function(){});
 }
 
-function syncClock(n){
-  n=n||1;
-  for(var i=0;i<n;i++)setTimeout(kelloNayte,i*350);
-}
-
-/* Kello käy hitaasti eri tahtia laitteissa, joten vanha näyte ei saa jäädä
-   ikuisesti voittajaksi: annetaan tuoreiden näytteiden korvata se. */
-setInterval(function(){
-  if(!S.code)return;
-  clockRtt=Math.min(clockRtt*1.7+40,3000);
-  syncClock(3);
-},45000);
-
-/* Kunnes kello on synkassa, yritetään tiheämmin. */
-setInterval(function(){
-  if(S.code&&netOn()&&!clockOk)syncClock(2);
-},3000);
+setInterval(function(){if(S.code)syncClock();},45000);
 
 /* ================= verkko ================= */
 var NET={url:null,es:null,hb:null,state:"off",rx:0};
@@ -1642,7 +1622,7 @@ function joinRoom(code){
   openStream();
   if(!NET.hb)NET.hb=setInterval(beat,BEAT);
   clockRtt=1e9;clockOk=false;
-  syncClock(5);
+  syncClock();
   setTimeout(syncClock,400);setTimeout(syncClock,1200);
   setTimeout(pullRoom,2200);
   setTimeout(pullRoom,5000);
@@ -2006,6 +1986,12 @@ function onRoom(prevRound,prevState){
        kun rengas animoituu — jolloin se syntyisi toisen kerran. Kirjataan
        tila valmiiksi, niin muutosta ei havaita. */
     S.wasLive=cardLive();
+    /* Piirretään täsmälleen heräämishetkellä eikä vasta seuraavassa
+       tikityksessä, jotta kortti on napautettavissa heti kun se näkyy. */
+    clearTimeout(S.liveT);
+    S.liveT=setTimeout(function(){
+      if(S.tab==="peli"&&S.screen==="mp"&&roomState()==="play")render();
+    },Math.max(0,waitMs()));
 
   }
   /* Kyltti vain jos viimeinen piste kuuluu juuri päättyneeseen kierrokseen.
@@ -2028,18 +2014,7 @@ function onRoom(prevRound,prevState){
      eri kuvastolla, jolloin kaikki kuvat näyttäisivät vaihtuvan. */
   if(ROOM&&ROOM.deal)S.lastDeal={a:ROOM.deal.a,b:ROOM.deal.b,s:ROOM.deal.s,
     o:ROOM.deal.o||0};
-  if(ROOM&&typeof ROOM.at==="number"&&ROOM.at!==S.atSeen){
-    S.atSeen=ROOM.at;S.dealSeen=Date.now();
-    /* Piirto täsmälleen heräämishetkellä. Aiemmin tämä ajastettiin vain
-       paljastuksesta, joten matsin ensimmäinen kortti jäi tikityksen
-       varaan — se herää eri hetkellä eri laitteissa. */
-    if(S.tab==="peli"&&S.screen==="mp"){
-      clearTimeout(S.liveT);
-      S.liveT=setTimeout(function(){
-        if(S.tab==="peli"&&S.screen==="mp")render();
-      },Math.max(0,waitMs()));
-    }
-  }
+  if(ROOM&&typeof ROOM.at==="number"&&ROOM.at!==S.atSeen){S.atSeen=ROOM.at;S.dealSeen=Date.now();}
   hostArbitrate();hostFinalize();hostRescue();hostPublish();
   if(S.tab!=="peli"||S.screen!=="mp")return;
   siivoaChat();
@@ -2123,7 +2098,7 @@ function reconnect(){
   esTries=0;
   if(esRetry){clearTimeout(esRetry);esRetry=null;}
   NET.state="connecting";paintDot();
-  if(S.code){openStream();pullRoom();syncClock(5);beat();}
+  if(S.code){openStream();pullRoom();syncClock();beat();}
   else loadLobbies();
 }
 
